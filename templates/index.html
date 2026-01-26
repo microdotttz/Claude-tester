@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#1a1a2e">
+    <title>Stock Analyzer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-card: #0f3460;
+            --text-primary: #eee;
+            --text-secondary: #aaa;
+            --accent: #e94560;
+            --green: #00d26a;
+            --red: #ff6b6b;
+            --yellow: #ffd93d;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            padding-bottom: 80px;
+        }
+
+        .header {
+            background: var(--bg-secondary);
+            padding: 15px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .search-container {
+            position: relative;
+        }
+
+        .search-input {
+            background: var(--bg-card);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: var(--text-primary);
+            border-radius: 25px;
+            padding: 12px 20px;
+            padding-right: 50px;
+            width: 100%;
+            font-size: 16px;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .search-btn {
+            position: absolute;
+            right: 5px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--accent);
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            color: white;
+        }
+
+        .suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--bg-card);
+            border-radius: 10px;
+            margin-top: 5px;
+            overflow: hidden;
+            display: none;
+            z-index: 1000;
+        }
+
+        .suggestions.show {
+            display: block;
+        }
+
+        .suggestion-item {
+            padding: 12px 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            cursor: pointer;
+        }
+
+        .suggestion-item:hover, .suggestion-item:active {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .suggestion-symbol {
+            font-weight: bold;
+            color: var(--accent);
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: none;
+            border-radius: 15px;
+            margin-bottom: 15px;
+        }
+
+        .card-header {
+            background: transparent;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding: 15px;
+        }
+
+        .price-display {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .current-price {
+            font-size: 42px;
+            font-weight: bold;
+        }
+
+        .price-change {
+            font-size: 18px;
+            margin-top: 5px;
+        }
+
+        .price-up { color: var(--green); }
+        .price-down { color: var(--red); }
+
+        .chart-container {
+            width: 100%;
+            height: 300px;
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .indicator-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            padding: 15px;
+        }
+
+        .indicator-item {
+            background: var(--bg-secondary);
+            padding: 12px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .indicator-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 5px;
+        }
+
+        .indicator-value {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .signal-card {
+            padding: 12px 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .signal-buy { background: rgba(0, 210, 106, 0.2); border-left: 4px solid var(--green); }
+        .signal-sell { background: rgba(255, 107, 107, 0.2); border-left: 4px solid var(--red); }
+        .signal-hold { background: rgba(255, 217, 61, 0.2); border-left: 4px solid var(--yellow); }
+
+        .recommendation-badge {
+            display: inline-block;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 20px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .rec-strong-buy, .rec-buy { background: var(--green); color: #000; }
+        .rec-strong-sell, .rec-sell { background: var(--red); color: #fff; }
+        .rec-hold { background: var(--yellow); color: #000; }
+
+        .period-tabs {
+            display: flex;
+            gap: 5px;
+            padding: 10px 15px;
+            overflow-x: auto;
+        }
+
+        .period-tab {
+            padding: 8px 16px;
+            border-radius: 20px;
+            background: var(--bg-secondary);
+            border: none;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            font-size: 14px;
+        }
+
+        .period-tab.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 50px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid var(--bg-card);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .results {
+            display: none;
+        }
+
+        .results.show {
+            display: block;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state i {
+            font-size: 60px;
+            margin-bottom: 20px;
+        }
+
+        .level-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .support { color: var(--green); }
+        .resistance { color: var(--red); }
+
+        .disclaimer {
+            background: rgba(255, 107, 107, 0.1);
+            border: 1px solid var(--red);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 15px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .mini-chart {
+            height: 60px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h5 class="mb-3"><i class="bi bi-graph-up-arrow"></i> Stock Analyzer</h5>
+        <div class="search-container">
+            <input type="text" class="search-input" id="symbolInput" placeholder="Search stocks (e.g., AAPL, TSLA)" autocomplete="off">
+            <button class="search-btn" onclick="analyzeStock()">
+                <i class="bi bi-search"></i>
+            </button>
+            <div class="suggestions" id="suggestions"></div>
+        </div>
+    </div>
+
+    <div class="container-fluid px-3 py-3">
+        <!-- Empty State -->
+        <div class="empty-state" id="emptyState">
+            <i class="bi bi-bar-chart-line"></i>
+            <h5>Search for a stock</h5>
+            <p>Enter a symbol to get technical analysis and trading signals</p>
+            <div class="mt-4">
+                <small>Popular: </small>
+                <button class="btn btn-sm btn-outline-light mx-1" onclick="quickSearch('AAPL')">AAPL</button>
+                <button class="btn btn-sm btn-outline-light mx-1" onclick="quickSearch('TSLA')">TSLA</button>
+                <button class="btn btn-sm btn-outline-light mx-1" onclick="quickSearch('NVDA')">NVDA</button>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div class="loading" id="loading">
+            <div class="spinner mx-auto"></div>
+            <p class="mt-3">Analyzing...</p>
+        </div>
+
+        <!-- Results -->
+        <div class="results" id="results">
+            <!-- Price Card -->
+            <div class="card">
+                <div class="price-display">
+                    <div class="text-secondary" id="companyName">-</div>
+                    <div class="current-price" id="currentPrice">$0.00</div>
+                    <div class="price-change" id="priceChange">-</div>
+                </div>
+
+                <!-- Period Tabs -->
+                <div class="period-tabs">
+                    <button class="period-tab" data-period="1mo">1M</button>
+                    <button class="period-tab" data-period="3mo">3M</button>
+                    <button class="period-tab active" data-period="6mo">6M</button>
+                    <button class="period-tab" data-period="1y">1Y</button>
+                    <button class="period-tab" data-period="2y">2Y</button>
+                </div>
+
+                <!-- Chart -->
+                <div class="chart-container" id="priceChart"></div>
+            </div>
+
+            <!-- Recommendation -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-lightning-fill"></i> Recommendation</h6>
+                </div>
+                <div class="card-body text-center py-4">
+                    <div class="recommendation-badge" id="recommendation">HOLD</div>
+                    <div class="mt-2 text-secondary">
+                        Confidence: <span id="confidence">0</span>%
+                    </div>
+                </div>
+            </div>
+
+            <!-- Signals -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-broadcast"></i> Active Signals</h6>
+                </div>
+                <div class="card-body" id="signalsContainer">
+                    <p class="text-secondary">No signals</p>
+                </div>
+            </div>
+
+            <!-- Indicators -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-speedometer2"></i> Technical Indicators</h6>
+                </div>
+                <div class="indicator-grid" id="indicatorsGrid">
+                    <!-- Filled by JS -->
+                </div>
+            </div>
+
+            <!-- RSI Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">RSI (14)</h6>
+                </div>
+                <div class="chart-container" id="rsiChart" style="height: 150px;"></div>
+            </div>
+
+            <!-- MACD Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">MACD</h6>
+                </div>
+                <div class="chart-container" id="macdChart" style="height: 150px;"></div>
+            </div>
+
+            <!-- Support/Resistance -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-arrows-expand"></i> Support & Resistance</h6>
+                </div>
+                <div class="card-body" id="levelsContainer">
+                    <!-- Filled by JS -->
+                </div>
+            </div>
+
+            <!-- Disclaimer -->
+            <div class="disclaimer">
+                <strong><i class="bi bi-exclamation-triangle"></i> Disclaimer:</strong>
+                This tool is for educational purposes only. Technical analysis cannot reliably predict market movements.
+                Always do your own research and consider consulting a financial advisor before making investment decisions.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentSymbol = '';
+        let currentPeriod = '6mo';
+        let priceChart, rsiChart, macdChart;
+        let chartData = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSuggestions();
+
+            // Period tab clicks
+            document.querySelectorAll('.period-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.period-tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    currentPeriod = tab.dataset.period;
+                    if (currentSymbol) analyzeStock();
+                });
+            });
+        });
+
+        // Search input handling
+        const symbolInput = document.getElementById('symbolInput');
+        let debounceTimer;
+
+        symbolInput.addEventListener('input', () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                const query = symbolInput.value.trim();
+                if (query.length > 0) {
+                    loadSuggestions(query);
+                } else {
+                    loadSuggestions();
+                }
+            }, 200);
+        });
+
+        symbolInput.addEventListener('focus', () => {
+            document.getElementById('suggestions').classList.add('show');
+        });
+
+        symbolInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('suggestions').classList.remove('show');
+                analyzeStock();
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.search-container')) {
+                document.getElementById('suggestions').classList.remove('show');
+            }
+        });
+
+        async function loadSuggestions(query = '') {
+            try {
+                const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+                const suggestions = await response.json();
+
+                const container = document.getElementById('suggestions');
+                container.innerHTML = suggestions.map(s => `
+                    <div class="suggestion-item" onclick="selectStock('${s.symbol}')">
+                        <span class="suggestion-symbol">${s.symbol}</span>
+                        <span class="text-secondary ms-2">${s.name}</span>
+                    </div>
+                `).join('');
+                container.classList.add('show');
+            } catch (e) {
+                console.error('Failed to load suggestions:', e);
+            }
+        }
+
+        function selectStock(symbol) {
+            symbolInput.value = symbol;
+            document.getElementById('suggestions').classList.remove('show');
+            analyzeStock();
+        }
+
+        function quickSearch(symbol) {
+            symbolInput.value = symbol;
+            analyzeStock();
+        }
+
+        async function analyzeStock() {
+            const symbol = symbolInput.value.trim().toUpperCase();
+            if (!symbol) return;
+
+            currentSymbol = symbol;
+
+            // Show loading
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('results').classList.remove('show');
+            document.getElementById('loading').classList.add('show');
+
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symbol, period: currentPeriod })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Analysis failed');
+                }
+
+                chartData = data.chart_data;
+                updateUI(data);
+                document.getElementById('loading').classList.remove('show');
+                document.getElementById('results').classList.add('show');
+
+            } catch (error) {
+                document.getElementById('loading').classList.remove('show');
+                document.getElementById('emptyState').style.display = 'block';
+                alert(error.message);
+            }
+        }
+
+        function updateUI(data) {
+            // Company & Price
+            document.getElementById('companyName').textContent = data.company_name;
+            document.getElementById('currentPrice').textContent = `$${data.current_price.toFixed(2)}`;
+
+            const changeEl = document.getElementById('priceChange');
+            const changeClass = data.price_change >= 0 ? 'price-up' : 'price-down';
+            const changeIcon = data.price_change >= 0 ? '▲' : '▼';
+            changeEl.className = `price-change ${changeClass}`;
+            changeEl.textContent = `${changeIcon} $${Math.abs(data.price_change).toFixed(2)} (${data.price_change_pct >= 0 ? '+' : ''}${data.price_change_pct.toFixed(2)}%)`;
+
+            // Recommendation
+            const recEl = document.getElementById('recommendation');
+            recEl.textContent = data.recommendation.action;
+            recEl.className = 'recommendation-badge rec-' + data.recommendation.action.toLowerCase().replace(' ', '-');
+            document.getElementById('confidence').textContent = data.recommendation.confidence;
+
+            // Signals
+            const signalsContainer = document.getElementById('signalsContainer');
+            if (data.signals.length > 0) {
+                signalsContainer.innerHTML = data.signals.map(s => {
+                    const signalClass = s.type.includes('BUY') ? 'signal-buy' :
+                                       s.type.includes('SELL') ? 'signal-sell' : 'signal-hold';
+                    return `
+                        <div class="signal-card ${signalClass}">
+                            <strong>${s.type}</strong>
+                            <span class="text-secondary">${s.indicator}: ${s.reason}</span>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                signalsContainer.innerHTML = '<p class="text-secondary text-center">No active signals</p>';
+            }
+
+            // Indicators
+            const ind = data.indicators;
+            document.getElementById('indicatorsGrid').innerHTML = `
+                <div class="indicator-item">
+                    <div class="indicator-label">RSI (14)</div>
+                    <div class="indicator-value ${getRSIColor(ind.rsi)}">${ind.rsi ?? '-'}</div>
+                </div>
+                <div class="indicator-item">
+                    <div class="indicator-label">MACD</div>
+                    <div class="indicator-value">${ind.macd?.toFixed(2) ?? '-'}</div>
+                </div>
+                <div class="indicator-item">
+                    <div class="indicator-label">SMA 20</div>
+                    <div class="indicator-value">$${ind.sma_20?.toFixed(2) ?? '-'}</div>
+                </div>
+                <div class="indicator-item">
+                    <div class="indicator-label">SMA 50</div>
+                    <div class="indicator-value">$${ind.sma_50?.toFixed(2) ?? '-'}</div>
+                </div>
+                <div class="indicator-item">
+                    <div class="indicator-label">SMA 200</div>
+                    <div class="indicator-value">$${ind.sma_200?.toFixed(2) ?? '-'}</div>
+                </div>
+                <div class="indicator-item">
+                    <div class="indicator-label">Stochastic %K</div>
+                    <div class="indicator-value">${ind.stoch_k ?? '-'}</div>
+                </div>
+                <div class="indicator-item">
+                    <div class="indicator-label">ATR (14)</div>
+                    <div class="indicator-value">$${ind.atr ?? '-'}</div>
+                </div>
+                <div class="indicator-item">
+                    <div class="indicator-label">Volume</div>
+                    <div class="indicator-value">${formatVolume(data.volume)}</div>
+                </div>
+            `;
+
+            // Support/Resistance
+            const levelsContainer = document.getElementById('levelsContainer');
+            let levelsHTML = '<h6 class="text-success mb-2">Support Levels</h6>';
+            data.support_levels.forEach((level, i) => {
+                levelsHTML += `<div class="level-item"><span>S${i+1}</span><span class="support">$${level.toFixed(2)}</span></div>`;
+            });
+            levelsHTML += '<h6 class="text-danger mb-2 mt-3">Resistance Levels</h6>';
+            data.resistance_levels.forEach((level, i) => {
+                levelsHTML += `<div class="level-item"><span>R${i+1}</span><span class="resistance">$${level.toFixed(2)}</span></div>`;
+            });
+            levelsContainer.innerHTML = levelsHTML;
+
+            // Render charts
+            renderCharts(data.chart_data);
+        }
+
+        function getRSIColor(rsi) {
+            if (!rsi) return '';
+            if (rsi < 30) return 'text-success';
+            if (rsi > 70) return 'text-danger';
+            return '';
+        }
+
+        function formatVolume(vol) {
+            if (vol >= 1e9) return (vol / 1e9).toFixed(1) + 'B';
+            if (vol >= 1e6) return (vol / 1e6).toFixed(1) + 'M';
+            if (vol >= 1e3) return (vol / 1e3).toFixed(1) + 'K';
+            return vol.toString();
+        }
+
+        function renderCharts(data) {
+            // Clear existing charts
+            document.getElementById('priceChart').innerHTML = '';
+            document.getElementById('rsiChart').innerHTML = '';
+            document.getElementById('macdChart').innerHTML = '';
+
+            // Price Chart
+            const priceChartEl = document.getElementById('priceChart');
+            priceChart = LightweightCharts.createChart(priceChartEl, {
+                width: priceChartEl.clientWidth,
+                height: 300,
+                layout: {
+                    background: { color: '#16213e' },
+                    textColor: '#aaa',
+                },
+                grid: {
+                    vertLines: { color: 'rgba(255,255,255,0.1)' },
+                    horzLines: { color: 'rgba(255,255,255,0.1)' },
+                },
+                timeScale: {
+                    borderColor: 'rgba(255,255,255,0.1)',
+                },
+            });
+
+            const candlestickSeries = priceChart.addCandlestickSeries({
+                upColor: '#00d26a',
+                downColor: '#ff6b6b',
+                borderUpColor: '#00d26a',
+                borderDownColor: '#ff6b6b',
+                wickUpColor: '#00d26a',
+                wickDownColor: '#ff6b6b',
+            });
+
+            const candleData = data.dates.map((date, i) => ({
+                time: date,
+                open: data.ohlc.open[i],
+                high: data.ohlc.high[i],
+                low: data.ohlc.low[i],
+                close: data.ohlc.close[i],
+            }));
+            candlestickSeries.setData(candleData);
+
+            // Add SMA lines
+            if (data.indicators.sma_20.length) {
+                const sma20 = priceChart.addLineSeries({ color: '#3498db', lineWidth: 1 });
+                sma20.setData(data.dates.map((date, i) => ({
+                    time: date,
+                    value: data.indicators.sma_20[i] === 'null' ? null : data.indicators.sma_20[i]
+                })).filter(d => d.value !== null));
+            }
+
+            if (data.indicators.sma_50.length) {
+                const sma50 = priceChart.addLineSeries({ color: '#f39c12', lineWidth: 1 });
+                sma50.setData(data.dates.map((date, i) => ({
+                    time: date,
+                    value: data.indicators.sma_50[i] === 'null' ? null : data.indicators.sma_50[i]
+                })).filter(d => d.value !== null));
+            }
+
+            priceChart.timeScale().fitContent();
+
+            // RSI Chart
+            const rsiChartEl = document.getElementById('rsiChart');
+            rsiChart = LightweightCharts.createChart(rsiChartEl, {
+                width: rsiChartEl.clientWidth,
+                height: 150,
+                layout: {
+                    background: { color: '#16213e' },
+                    textColor: '#aaa',
+                },
+                grid: {
+                    vertLines: { color: 'rgba(255,255,255,0.1)' },
+                    horzLines: { color: 'rgba(255,255,255,0.1)' },
+                },
+            });
+
+            const rsiSeries = rsiChart.addLineSeries({ color: '#9b59b6', lineWidth: 2 });
+            rsiSeries.setData(data.dates.map((date, i) => ({
+                time: date,
+                value: data.indicators.rsi[i] === 'null' ? null : data.indicators.rsi[i]
+            })).filter(d => d.value !== null));
+
+            // Add RSI levels
+            rsiSeries.createPriceLine({ price: 70, color: '#ff6b6b', lineWidth: 1, lineStyle: 2 });
+            rsiSeries.createPriceLine({ price: 30, color: '#00d26a', lineWidth: 1, lineStyle: 2 });
+            rsiChart.timeScale().fitContent();
+
+            // MACD Chart
+            const macdChartEl = document.getElementById('macdChart');
+            macdChart = LightweightCharts.createChart(macdChartEl, {
+                width: macdChartEl.clientWidth,
+                height: 150,
+                layout: {
+                    background: { color: '#16213e' },
+                    textColor: '#aaa',
+                },
+                grid: {
+                    vertLines: { color: 'rgba(255,255,255,0.1)' },
+                    horzLines: { color: 'rgba(255,255,255,0.1)' },
+                },
+            });
+
+            const macdSeries = macdChart.addLineSeries({ color: '#3498db', lineWidth: 2 });
+            const signalSeries = macdChart.addLineSeries({ color: '#f39c12', lineWidth: 1 });
+            const histogramSeries = macdChart.addHistogramSeries({
+                color: '#26a69a',
+                priceFormat: { type: 'volume' },
+            });
+
+            macdSeries.setData(data.dates.map((date, i) => ({
+                time: date,
+                value: data.indicators.macd[i] === 'null' ? null : data.indicators.macd[i]
+            })).filter(d => d.value !== null));
+
+            signalSeries.setData(data.dates.map((date, i) => ({
+                time: date,
+                value: data.indicators.macd_signal[i] === 'null' ? null : data.indicators.macd_signal[i]
+            })).filter(d => d.value !== null));
+
+            histogramSeries.setData(data.dates.map((date, i) => {
+                const val = data.indicators.macd_histogram[i];
+                if (val === 'null') return null;
+                return {
+                    time: date,
+                    value: val,
+                    color: val >= 0 ? '#00d26a' : '#ff6b6b'
+                };
+            }).filter(d => d !== null));
+
+            macdChart.timeScale().fitContent();
+
+            // Handle resize
+            window.addEventListener('resize', () => {
+                priceChart.applyOptions({ width: priceChartEl.clientWidth });
+                rsiChart.applyOptions({ width: rsiChartEl.clientWidth });
+                macdChart.applyOptions({ width: macdChartEl.clientWidth });
+            });
+        }
+    </script>
+</body>
+</html>

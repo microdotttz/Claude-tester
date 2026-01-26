@@ -18,6 +18,7 @@ A Python-based technical analysis tool for analyzing stocks and generating tradi
 - **Signal Generation**: Automated buy/sell signals based on multiple indicators
 - **Support/Resistance**: Automatic identification of key price levels
 - **Visualization**: Candlestick charts with indicator overlays
+- **Mobile Web App**: Responsive web interface accessible from any phone
 
 ## Installation
 
@@ -45,6 +46,32 @@ python analyze.py MSFT --save analysis.png
 # Get basic stock info only
 python analyze.py NVDA --info
 ```
+
+### Mobile Web App (Access from Phone)
+
+Run the web server on your computer:
+
+```bash
+python web_app.py
+```
+
+Then access from your phone:
+
+1. **Same WiFi Network**: Open your phone's browser and go to `http://<your-computer-ip>:5000`
+   - Find your computer's IP: `ipconfig` (Windows) or `ifconfig`/`ip addr` (Mac/Linux)
+   - Example: `http://192.168.1.100:5000`
+
+2. **Add to Home Screen** (optional):
+   - iOS: Tap Share → "Add to Home Screen"
+   - Android: Tap menu → "Add to Home Screen"
+
+3. **Cloud Deployment** (access from anywhere):
+   ```bash
+   # Using ngrok for quick public URL
+   ngrok http 5000
+
+   # Or deploy to a cloud service like Railway, Render, or Heroku
+   ```
 
 ### As a Module
 
