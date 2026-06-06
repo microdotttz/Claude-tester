@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#f97316">
+<title>U-Haul Trailer Optimizer</title>
+<style>
+  :root {
+    --orange: #f97316; --orange-dark: #ea580c; --green: #16a34a;
+    --red: #dc2626; --bg: #0f172a; --card: #1e293b; --card2: #334155;
+    --text: #f1f5f9; --muted: #94a3b8; --line: #334155;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); padding-bottom: 96px;
+  }
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: linear-gradient(135deg, var(--orange), var(--orange-dark));
+    padding: 16px 18px; box-shadow: 0 2px 12px rgba(0,0,0,.4);
+  }
+  header h1 { margin: 0; font-size: 20px; letter-spacing: .3px; }
+  header p { margin: 4px 0 0; font-size: 12px; opacity: .9; }
+  .wrap { padding: 16px; max-width: 760px; margin: 0 auto; }
+  h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin: 22px 0 10px; }
+
+  .search { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--card); color: var(--text); font-size: 16px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .item {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px;
+    display: flex; flex-direction: column; gap: 6px; transition: border-color .15s;
+  }
+  .item.active { border-color: var(--orange); }
+  .item .name { font-size: 14px; font-weight: 600; line-height: 1.2; }
+  .item .dims { font-size: 11px; color: var(--muted); }
+  .stepper { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+  .stepper button {
+    width: 34px; height: 34px; border-radius: 9px; border: none; font-size: 20px; font-weight: 700;
+    background: var(--card2); color: var(--text); cursor: pointer; line-height: 1;
+  }
+  .stepper button:active { background: var(--orange); }
+  .stepper .qty { font-size: 16px; font-weight: 700; min-width: 24px; text-align: center; }
+
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .row input {
+    flex: 1; min-width: 0; padding: 11px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--card); color: var(--text); font-size: 15px;
+  }
+  .addbtn { background: var(--card2); border: 1px solid var(--line); color: var(--text);
+    border-radius: 10px; padding: 11px 16px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .toggle { display: flex; align-items: center; gap: 10px; margin: 14px 0; font-size: 14px; color: var(--muted); }
+  .toggle input { width: 20px; height: 20px; accent-color: var(--orange); }
+
+  .selected { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { background: var(--card2); border-radius: 20px; padding: 6px 12px; font-size: 13px;
+    display: flex; align-items: center; gap: 8px; }
+  .chip b { color: var(--orange); }
+  .chip span { cursor: pointer; color: var(--muted); font-weight: 700; }
+
+  .bar { background: var(--card); border-radius: 8px; height: 14px; overflow: hidden; border: 1px solid var(--line); }
+  .bar > div { height: 100%; background: linear-gradient(90deg, var(--orange), var(--orange-dark)); }
+  .bar.over > div { background: var(--red); }
+
+  #result { margin-top: 8px; }
+  .reco { border-radius: 16px; padding: 18px; margin-bottom: 16px; }
+  .reco.ok { background: rgba(22,163,74,.12); border: 1px solid var(--green); }
+  .reco.no { background: rgba(220,38,38,.12); border: 1px solid var(--red); }
+  .reco .big { font-size: 22px; font-weight: 800; margin: 4px 0 6px; }
+  .reco.ok .big { color: #4ade80; } .reco.no .big { color: #f87171; }
+  .reco .sub { font-size: 13px; color: var(--muted); }
+
+  .tcard { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+  .tcard .top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .tcard .tname { font-weight: 600; font-size: 15px; }
+  .tcard .verdict { font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 20px; }
+  .verdict.yes { background: rgba(22,163,74,.2); color: #4ade80; }
+  .verdict.no { background: rgba(220,38,38,.2); color: #f87171; }
+  .tcard .meta { font-size: 12px; color: var(--muted); margin: 6px 0; }
+  .tcard .blockers { font-size: 12px; color: #fca5a5; margin-top: 6px; }
+
+  .footbar {
+    position: fixed; bottom: 0; left: 0; right: 0; padding: 12px 16px;
+    background: rgba(15,23,42,.96); backdrop-filter: blur(8px); border-top: 1px solid var(--line);
+    display: flex; gap: 12px; align-items: center;
+  }
+  .footbar .tally { font-size: 13px; color: var(--muted); flex: 1; }
+  .footbar .tally b { color: var(--text); }
+  .go {
+    background: var(--orange); color: #fff; border: none; border-radius: 12px;
+    padding: 14px 22px; font-size: 16px; font-weight: 700; cursor: pointer; min-width: 150px;
+  }
+  .go:disabled { opacity: .5; }
+  .disclaimer { font-size: 11px; color: var(--muted); margin-top: 18px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📦 U-Haul Trailer Optimizer</h1>
+  <p>Pick your furniture — we'll find the smallest trailer it fits in.</p>
+</header>
+
+<div class="wrap">
+  <input class="search" id="search" placeholder="Search furniture…" oninput="renderCatalog()">
+
+  <h2>Furniture catalog</h2>
+  <div class="grid" id="catalog"></div>
+
+  <h2>Add a custom item</h2>
+  <div class="row">
+    <input id="c_name" placeholder="Name">
+  </div>
+  <div class="row" style="margin-top:8px">
+    <input id="c_l" type="number" inputmode="decimal" placeholder="Length in">
+    <input id="c_w" type="number" inputmode="decimal" placeholder="Width in">
+    <input id="c_h" type="number" inputmode="decimal" placeholder="Height in">
+    <input id="c_wt" type="number" inputmode="decimal" placeholder="Lbs">
+    <button class="addbtn" onclick="addCustom()">Add</button>
+  </div>
+
+  <div class="toggle">
+    <input type="checkbox" id="enclosed">
+    <label for="enclosed">Enclosed (weatherproof) trailers only</label>
+  </div>
+
+  <h2>Selected items</h2>
+  <div class="selected" id="selected"><span class="sub" style="color:var(--muted);font-size:13px">Nothing selected yet.</span></div>
+
+  <div id="result"></div>
+
+  <p class="disclaimer">
+    Estimates use a 3D packing heuristic — a real, careful load may do a little better or worse.
+    Trailer dimensions are approximate; confirm exact specs and weight limits at uhaul.com,
+    and measure tight pieces. Pack heavy, flat items low; stand sofas and mattresses on edge.
+  </p>
+</div>
+
+<div class="footbar">
+  <div class="tally"><b id="t_count">0</b> items · <b id="t_vol">0</b> cu ft · <b id="t_wt">0</b> lbs</div>
+  <button class="go" id="go" onclick="optimize()" disabled>Find my trailer</button>
+</div>
+
+<script>
+const CATALOG = {{ catalog | tojson }};
+// state: slug/customId -> { item, qty }
+const picked = new Map();
+let customSeq = 0;
+
+function fmt(n) { return Math.round(n).toLocaleString(); }
+
+function renderCatalog() {
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  const box = document.getElementById('catalog');
+  box.innerHTML = '';
+  CATALOG.filter(c => !q || c.name.toLowerCase().includes(q) || c.slug.includes(q)).forEach(c => {
+    const qty = picked.get(c.slug)?.qty || 0;
+    const el = document.createElement('div');
+    el.className = 'item' + (qty ? ' active' : '');
+    el.innerHTML = `
+      <div class="name">${c.name}</div>
+      <div class="dims">${c.length}×${c.width}×${c.height}" · ${c.volume} cu ft</div>
+      <div class="stepper">
+        <button aria-label="remove">−</button>
+        <span class="qty">${qty}</span>
+        <button aria-label="add">+</button>
+      </div>`;
+    const [minus, , plus] = el.querySelectorAll('button, .qty');
+    el.querySelectorAll('button')[0].onclick = () => bump(c, -1);
+    el.querySelectorAll('button')[1].onclick = () => bump(c, +1);
+    box.appendChild(el);
+  });
+}
+
+function bump(c, delta) {
+  const cur = picked.get(c.slug);
+  const qty = (cur?.qty || 0) + delta;
+  if (qty <= 0) picked.delete(c.slug);
+  else picked.set(c.slug, { item: { slug: c.slug, name: c.name, volume: c.volume, weight: c.weight, quantity: qty }, qty });
+  refresh();
+}
+
+function addCustom() {
+  const name = document.getElementById('c_name').value.trim() || 'Custom item';
+  const l = parseFloat(document.getElementById('c_l').value);
+  const w = parseFloat(document.getElementById('c_w').value);
+  const h = parseFloat(document.getElementById('c_h').value);
+  const wt = parseFloat(document.getElementById('c_wt').value) || 0;
+  if (!(l > 0 && w > 0 && h > 0)) { alert('Enter length, width and height in inches.'); return; }
+  const id = 'custom_' + (customSeq++);
+  const volume = +( (l*w*h)/1728 ).toFixed(1);
+  picked.set(id, { item: { name, length: l, width: w, height: h, weight: wt, volume, quantity: 1 }, qty: 1, custom: true });
+  ['c_name','c_l','c_w','c_h','c_wt'].forEach(i => document.getElementById(i).value = '');
+  refresh();
+}
+
+function removeKey(key) { picked.delete(key); refresh(); }
+
+function refresh() {
+  const sel = document.getElementById('selected');
+  if (picked.size === 0) {
+    sel.innerHTML = '<span style="color:var(--muted);font-size:13px">Nothing selected yet.</span>';
+  } else {
+    sel.innerHTML = '';
+    for (const [key, v] of picked) {
+      const chip = document.createElement('div');
+      chip.className = 'chip';
+      chip.innerHTML = `<b>${v.qty}×</b> ${v.item.name} <span>✕</span>`;
+      chip.querySelector('span').onclick = () => removeKey(key);
+      sel.appendChild(chip);
+    }
+  }
+  let count = 0, vol = 0, wt = 0;
+  for (const v of picked.values()) { count += v.qty; vol += v.item.volume * v.qty; wt += (v.item.weight || 0) * v.qty; }
+  document.getElementById('t_count').textContent = count;
+  document.getElementById('t_vol').textContent = fmt(vol);
+  document.getElementById('t_wt').textContent = fmt(wt);
+  document.getElementById('go').disabled = picked.size === 0;
+  renderCatalog();
+}
+
+async function optimize() {
+  const go = document.getElementById('go');
+  go.disabled = true; go.textContent = 'Calculating…';
+  const items = [...picked.values()].map(v => v.item);
+  try {
+    const res = await fetch('/api/optimize', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items, enclosed_only: document.getElementById('enclosed').checked }),
+    });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error || 'Something went wrong.'); return; }
+    renderResult(data);
+  } catch (e) {
+    alert('Network error: ' + e.message);
+  } finally {
+    go.disabled = picked.size === 0; go.textContent = 'Find my trailer';
+  }
+}
+
+function bar(pct, over) {
+  return `<div class="bar ${over ? 'over' : ''}"><div style="width:${Math.min(100, pct)}%"></div></div>`;
+}
+
+function renderResult(d) {
+  const r = document.getElementById('result');
+  let html = '<h2>Recommendation</h2>';
+  if (d.recommended) {
+    const t = d.recommended;
+    html += `<div class="reco ok">
+      <div class="sub">✅ Smallest trailer that fits everything</div>
+      <div class="big">${t.trailer}</div>
+      <div class="sub">${t.summary}</div>
+      <div style="margin:10px 0">${bar(t.utilization, false)}</div>
+      <div class="sub">Packs to ~${t.utilization}% of capacity · ${t.note}</div>
+    </div>`;
+  } else {
+    html += `<div class="reco no">
+      <div class="big">No single trailer fits it all</div>
+      <div class="sub">Your ${fmt(d.total_volume)} cu ft load is more than any catalog trailer.
+      Consider a moving truck (10'–26'), two trips, or paring down.</div>
+    </div>`;
+  }
+
+  html += '<h2>Every trailer</h2>';
+  d.evaluations.forEach(e => {
+    html += `<div class="tcard">
+      <div class="top">
+        <span class="tname">${e.trailer}</span>
+        <span class="verdict ${e.fits ? 'yes' : 'no'}">${e.fits ? 'FITS' : 'NO'}</span>
+      </div>
+      <div class="meta">${e.summary}</div>
+      ${bar(e.utilization, e.utilization > 100)}
+      <div class="meta">${e.utilization}% full${e.fits && e.note ? ' · ' + e.note : ''}</div>
+      ${e.fits ? '' : '<div class="blockers">• ' + e.blockers.join('<br>• ') + '</div>'}
+    </div>`;
+  });
+  r.innerHTML = html;
+  r.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+renderCatalog();
+</script>
+</body>
+</html>

@@ -121,6 +121,113 @@ print(f"Recommendation: {recommendation.value} ({confidence*100:.0f}% confidence
 
 The authors and contributors are not responsible for any financial losses incurred from using this tool.
 
+---
+
+# U-Haul Space Optimizer
+
+A space optimizer that finds the **smallest U-Haul trailer** that fits all of
+your furniture. It models each piece in 3D, packs them with a bin-packing
+heuristic, and checks volume, interior dimensions, door clearance, and weight
+limits for every trailer in the catalog.
+
+## How it works
+
+For each trailer (smallest to largest), it verifies:
+
+1. **Weight** — total payload is under the trailer's max load.
+2. **Dimensions** — every item physically fits the interior in some rotation.
+3. **Door clearance** — every item fits through the door opening.
+4. **Volume** — the furniture's total volume doesn't exceed the trailer.
+5. **3D packing** — a greedy "maximal empty spaces" packer actually arranges
+   all the pieces inside, respecting `keep_upright` and `stackable` flags.
+
+The first trailer that passes all checks is the recommendation.
+
+> Packing in 3D is NP-hard, so this is a heuristic estimate. A successful pack
+> means "this should fit with careful loading." Confirm exact trailer specs and
+> weight limits at [uhaul.com](https://www.uhaul.com) and measure tight pieces.
+
+## CLI usage
+
+```bash
+# Pick items from the built-in catalog (slug[:quantity])
+python uhaul.py queen_mattress sofa dresser dining_chair:4 box_large:8
+
+# Restrict to enclosed (weatherproof) trailers
+python uhaul.py refrigerator washer dryer --enclosed-only
+
+# Add a custom item:  "Name=LengthxWidthxHeight:weight:quantity"  (inches/lbs)
+python uhaul.py "Antique hutch=44x20x72:150" sofa coffee_table
+
+# Load a full inventory from JSON
+python uhaul.py --file inventory.json
+
+# Browse what's available
+python uhaul.py --list-furniture
+python uhaul.py --list-trailers
+```
+
+`inventory.json` can be a list of catalog references and/or custom items:
+
+```json
+[
+  { "slug": "queen_mattress", "quantity": 1 },
+  { "slug": "sofa", "quantity": 1 },
+  { "name": "Tool chest", "length": 40, "width": 22, "height": 38,
+    "weight": 120, "quantity": 1, "keep_upright": true, "stackable": false }
+]
+```
+
+## Mobile web app
+
+```bash
+python uhaul_web.py
+```
+
+Then open `http://<your-computer-ip>:5001` on your phone (same WiFi). Tap
+furniture to add it, add any custom pieces, and hit **Find my trailer** for a
+recommendation with a per-trailer fit breakdown.
+
+## As a module
+
+```python
+from uhaul_optimizer import find_minimum_trailer, get_catalog_item, FurnitureItem
+
+items = [
+    get_catalog_item("queen_mattress"),
+    get_catalog_item("sofa"),
+    FurnitureItem("Tool chest", 40, 22, 38, weight=120, keep_upright=True),
+]
+
+rec = find_minimum_trailer(items)
+if rec.recommended:
+    print(f"Use a {rec.recommended.trailer.name} "
+          f"(~{rec.recommended.utilization*100:.0f}% full)")
+else:
+    print("No single trailer fits — consider a moving truck.")
+```
+
+## Item flags
+
+- `keep_upright` — the piece may only rotate about the vertical axis (dressers,
+  bookshelves, washers). Appliances like refrigerators are taller than every
+  trailer ceiling, so they're modeled to travel on their side; in a truck,
+  always move them upright.
+- `stackable` — whether other items may be placed on top. Glass tabletops and
+  TVs are flagged non-stackable so the space above them stays clear.
+
+## Tests
+
+```bash
+python tests/test_optimizer.py
+```
+
+## Disclaimer
+
+Trailer dimensions are approximate published values and vary by model year.
+This tool is for planning estimates only — always verify the exact trailer,
+its interior dimensions, and its load rating before you reserve and load.
+
 ## License
 
 MIT License
