@@ -102,12 +102,20 @@ def test_oversized_item_blocks_with_message():
 
 
 def test_door_clearance_blocks():
-    # Wide-and-tall item whose two smallest dims still exceed the door.
-    item = FurnitureItem("Slab", 10, 50, 50)  # smallest two are 50x50
+    # A chunky 40x50 cross-section can't pass a 45x46 door at any tilt angle.
+    item = FurnitureItem("Crate", 40, 50, 50)
     trailer = get_trailer("4x8 Cargo Trailer")  # door 45x46
     fit = evaluate_trailer([item], trailer)
     assert not fit.fits
     assert any("door" in b.lower() for b in fit.blockers)
+
+
+def test_thin_item_tilts_through_door():
+    # A full mattress (54" wide, 10" thick) clears a 48"x51" door tilted at
+    # ~40 degrees, just like in real life.
+    item = get_catalog_item("full_mattress")
+    fit = evaluate_trailer([item], get_trailer("5x8 Cargo Trailer"))
+    assert fit.fits, fit.blockers
 
 
 def test_huge_load_fits_nothing():

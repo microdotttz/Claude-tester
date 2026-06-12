@@ -136,7 +136,8 @@ For each trailer (smallest to largest), it verifies:
 
 1. **Weight** — total payload is under the trailer's max load.
 2. **Dimensions** — every item physically fits the interior in some rotation.
-3. **Door clearance** — every item fits through the door opening.
+3. **Door clearance** — every item fits through the door opening, straight-on
+   or tilted diagonally (how a 54"-wide mattress really enters a 48" door).
 4. **Volume** — the furniture's total volume doesn't exceed the trailer.
 5. **3D packing** — a greedy "maximal empty spaces" packer actually arranges
    all the pieces inside, respecting `keep_upright` and `stackable` flags.
@@ -146,6 +147,31 @@ The first trailer that passes all checks is the recommendation.
 > Packing in 3D is NP-hard, so this is a heuristic estimate. A successful pack
 > means "this should fit with careful loading." Confirm exact trailer specs and
 > weight limits at [uhaul.com](https://www.uhaul.com) and measure tight pieces.
+
+## Quick start (web app)
+
+One command — it installs Flask if needed, picks a free port, and opens your
+browser:
+
+```bash
+./start_uhaul.sh          # macOS / Linux
+start_uhaul.bat           # Windows (double-click works too)
+python launch_uhaul.py    # any platform
+```
+
+The terminal also prints a `http://<your-ip>:<port>` URL you can open on your
+phone over the same WiFi. Useful flags: `--port N`, `--no-browser`.
+
+The web UI gives you:
+
+- **Quick presets** — Dorm room, Studio, and 1-Bedroom starting points
+- A **categorized, searchable furniture catalog** — tap a card to add it
+- **Custom items** with dimensions, weight, upright/no-stack flags
+- An animated recommendation card with a capacity gauge
+- An **interactive isometric load plan** — drag the slider to step through the
+  exact loading order the packer computed, item by item
+- A per-trailer breakdown explaining *why* each trailer does or doesn't fit
+- Your load is saved in the browser, so it survives a refresh
 
 ## CLI usage
 
@@ -178,16 +204,6 @@ python uhaul.py --list-trailers
 ]
 ```
 
-## Mobile web app
-
-```bash
-python uhaul_web.py
-```
-
-Then open `http://<your-computer-ip>:5001` on your phone (same WiFi). Tap
-furniture to add it, add any custom pieces, and hit **Find my trailer** for a
-recommendation with a per-trailer fit breakdown.
-
 ## As a module
 
 ```python
@@ -210,16 +226,17 @@ else:
 ## Item flags
 
 - `keep_upright` — the piece may only rotate about the vertical axis (dressers,
-  bookshelves, washers). Appliances like refrigerators are taller than every
-  trailer ceiling, so they're modeled to travel on their side; in a truck,
-  always move them upright.
+  washers, TVs). Tall pieces like refrigerators and bookshelves are taller than
+  every trailer ceiling, so they're modeled to travel on their side or back; in
+  a truck, always move appliances upright.
 - `stackable` — whether other items may be placed on top. Glass tabletops and
   TVs are flagged non-stackable so the space above them stays clear.
 
 ## Tests
 
 ```bash
-python tests/test_optimizer.py
+python tests/test_optimizer.py   # packing engine + trailer evaluation
+python tests/test_web.py         # web API
 ```
 
 ## Disclaimer

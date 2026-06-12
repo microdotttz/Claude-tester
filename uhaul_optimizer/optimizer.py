@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 from .furniture import FurnitureItem
@@ -37,13 +38,21 @@ def _units_for(items: list[FurnitureItem]) -> list[Unit]:
 def _passes_door(item: FurnitureItem, trailer: Trailer) -> bool:
     """Can the item pass through the door opening in some orientation?
 
-    An item fits through a W x H opening if two of its three dimensions are no
-    larger than the opening (the third slides through as depth).
+    The cross-section perpendicular to travel is the item's two smallest
+    dimensions (the longest slides through as depth). That cross-section
+    clears the opening either straight-on or tilted: at tilt angle theta its
+    bounding box is (w*cos + t*sin) x (w*sin + t*cos), and sweeping theta over
+    0-90 degrees also covers the swapped orientation. This is how a 54"-wide
+    mattress really does enter a 48"-wide door.
     """
-    dims = sorted(item.dims())  # smallest two must clear the opening
-    a, b = dims[0], dims[1]
+    t, w = sorted(item.dims())[:2]  # thickness and width of the cross-section
     dw, dh = trailer.door_width, trailer.door_height
-    return (a <= dw and b <= dh) or (a <= dh and b <= dw)
+    for deg in range(0, 91):
+        a = math.radians(deg)
+        if (w * math.cos(a) + t * math.sin(a) <= dw
+                and w * math.sin(a) + t * math.cos(a) <= dh):
+            return True
+    return False
 
 
 def evaluate_trailer(items: list[FurnitureItem], trailer: Trailer) -> TrailerFit:
@@ -70,7 +79,7 @@ def evaluate_trailer(items: list[FurnitureItem], trailer: Trailer) -> TrailerFit
         elif not _passes_door(item, trailer):
             blockers.append(
                 f"{item.name} won't fit through the "
-                f"{trailer.door_width:.0f}\"x{trailer.door_height:.0f}\" door."
+                f"{trailer.door_width:.0f}\"x{trailer.door_height:.0f}\" door, even tilted."
             )
 
     # 3) Total volume can't exceed the trailer (a hard lower bound).

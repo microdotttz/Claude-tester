@@ -2,285 +2,763 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#f97316">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#ff7a18">
 <title>U-Haul Trailer Optimizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --orange: #f97316; --orange-dark: #ea580c; --green: #16a34a;
-    --red: #dc2626; --bg: #0f172a; --card: #1e293b; --card2: #334155;
-    --text: #f1f5f9; --muted: #94a3b8; --line: #334155;
+    --orange: #ff7a18; --orange2: #ff4d00; --green: #22c55e; --red: #ef4444;
+    --bg: #0b1020; --card: #141b2e; --card2: #1f2940; --line: #26314d;
+    --text: #eef2ff; --muted: #8b96b5; --radius: 16px;
+    --shadow: 0 8px 28px rgba(0,0,0,.35);
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { scroll-behavior: smooth; }
   body {
-    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: var(--bg); color: var(--text); padding-bottom: 96px;
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding-bottom: 110px;
   }
-  header {
-    position: sticky; top: 0; z-index: 10;
-    background: linear-gradient(135deg, var(--orange), var(--orange-dark));
-    padding: 16px 18px; box-shadow: 0 2px 12px rgba(0,0,0,.4);
-  }
-  header h1 { margin: 0; font-size: 20px; letter-spacing: .3px; }
-  header p { margin: 4px 0 0; font-size: 12px; opacity: .9; }
-  .wrap { padding: 16px; max-width: 760px; margin: 0 auto; }
-  h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin: 22px 0 10px; }
+  h1, h2, .big { font-family: Sora, Inter, sans-serif; }
 
-  .search { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line);
-    background: var(--card); color: var(--text); font-size: 16px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  /* ---------- hero ---------- */
+  .hero {
+    background:
+      radial-gradient(1200px 400px at 80% -120px, rgba(255,122,24,.28), transparent 60%),
+      linear-gradient(160deg, #131a30 0%, #0b1020 70%);
+    border-bottom: 1px solid var(--line);
+    padding: 26px 18px 22px;
+  }
+  .hero-inner { max-width: 860px; margin: 0 auto; display: flex; align-items: center; gap: 18px; }
+  .hero svg { flex-shrink: 0; }
+  .hero h1 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -.3px; }
+  .hero h1 em { font-style: normal; background: linear-gradient(90deg, var(--orange), #ffb068);
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .hero p { margin: 6px 0 0; font-size: 13.5px; color: var(--muted); line-height: 1.45; }
+
+  .wrap { max-width: 860px; margin: 0 auto; padding: 18px 16px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted);
+    margin: 26px 0 12px; font-weight: 800; }
+  h2:first-child { margin-top: 8px; }
+
+  /* ---------- presets ---------- */
+  .presets { display: flex; gap: 8px; flex-wrap: wrap; }
+  .preset {
+    background: var(--card); border: 1px solid var(--line); color: var(--text);
+    border-radius: 999px; padding: 9px 16px; font-size: 13.5px; font-weight: 600;
+    cursor: pointer; transition: border-color .15s, transform .1s;
+  }
+  .preset:hover { border-color: var(--orange); }
+  .preset:active { transform: scale(.96); }
+  .preset.ghost { color: var(--muted); }
+
+  /* ---------- search + pills ---------- */
+  .search {
+    width: 100%; padding: 13px 16px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--card); color: var(--text); font-size: 16px; outline: none;
+    transition: border-color .15s;
+  }
+  .search:focus { border-color: var(--orange); }
+  .pills { display: flex; gap: 8px; overflow-x: auto; padding: 12px 0 4px; scrollbar-width: none; }
+  .pills::-webkit-scrollbar { display: none; }
+  .pill {
+    flex-shrink: 0; background: var(--card); border: 1px solid var(--line); color: var(--muted);
+    border-radius: 999px; padding: 7px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: all .15s;
+  }
+  .pill.on { background: var(--orange); border-color: var(--orange); color: #1a0d00; }
+
+  /* ---------- catalog ---------- */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
   .item {
-    background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px;
-    display: flex; flex-direction: column; gap: 6px; transition: border-color .15s;
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 12px; cursor: pointer; user-select: none; position: relative;
+    transition: border-color .15s, transform .1s, box-shadow .15s;
   }
-  .item.active { border-color: var(--orange); }
-  .item .name { font-size: 14px; font-weight: 600; line-height: 1.2; }
+  .item:hover { border-color: #3a4a73; }
+  .item:active { transform: scale(.98); }
+  .item.active { border-color: var(--orange); box-shadow: 0 0 0 1px var(--orange), var(--shadow); }
+  .item .emoji { font-size: 22px; line-height: 1; }
+  .item .name { font-size: 13.5px; font-weight: 600; line-height: 1.25; margin: 7px 0 3px; }
   .item .dims { font-size: 11px; color: var(--muted); }
-  .stepper { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+  .item .stepper {
+    display: flex; align-items: center; justify-content: space-between; margin-top: 9px;
+  }
   .stepper button {
-    width: 34px; height: 34px; border-radius: 9px; border: none; font-size: 20px; font-weight: 700;
+    width: 32px; height: 32px; border-radius: 9px; border: none; font-size: 18px; font-weight: 700;
     background: var(--card2); color: var(--text); cursor: pointer; line-height: 1;
+    transition: background .12s;
   }
-  .stepper button:active { background: var(--orange); }
-  .stepper .qty { font-size: 16px; font-weight: 700; min-width: 24px; text-align: center; }
+  .stepper button:active { background: var(--orange); color: #1a0d00; }
+  .stepper .qty { font-size: 15px; font-weight: 700; min-width: 26px; text-align: center; }
+  .qty-badge {
+    position: absolute; top: -7px; right: -7px; min-width: 22px; height: 22px; padding: 0 6px;
+    border-radius: 999px; background: var(--orange); color: #1a0d00; font-size: 12px;
+    font-weight: 800; display: flex; align-items: center; justify-content: center;
+    box-shadow: var(--shadow);
+  }
 
-  .row { display: flex; gap: 8px; flex-wrap: wrap; }
-  .row input {
-    flex: 1; min-width: 0; padding: 11px; border-radius: 10px; border: 1px solid var(--line);
-    background: var(--card); color: var(--text); font-size: 15px;
+  /* ---------- custom item ---------- */
+  details.custom { background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 0; overflow: hidden; }
+  details.custom summary {
+    list-style: none; cursor: pointer; padding: 14px 16px; font-weight: 600; font-size: 14px;
+    display: flex; align-items: center; gap: 10px;
   }
-  .addbtn { background: var(--card2); border: 1px solid var(--line); color: var(--text);
-    border-radius: 10px; padding: 11px 16px; font-size: 15px; font-weight: 600; cursor: pointer; }
-  .toggle { display: flex; align-items: center; gap: 10px; margin: 14px 0; font-size: 14px; color: var(--muted); }
+  details.custom summary::-webkit-details-marker { display: none; }
+  details.custom summary::after { content: "+"; margin-left: auto; font-size: 20px; color: var(--muted); }
+  details.custom[open] summary::after { content: "–"; }
+  .custom-body { padding: 0 16px 16px; display: grid; gap: 8px; }
+  .custom-body .row { display: flex; gap: 8px; }
+  .custom-body input {
+    flex: 1; min-width: 0; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--text); font-size: 15px; outline: none;
+  }
+  .custom-body input:focus { border-color: var(--orange); }
+  .custom-body .flags { display: flex; gap: 16px; font-size: 13px; color: var(--muted); padding: 2px 0; }
+  .custom-body .flags label { display: flex; align-items: center; gap: 7px; }
+  .custom-body .flags input { width: 17px; height: 17px; accent-color: var(--orange); flex: none; }
+  .addbtn {
+    background: var(--card2); border: 1px solid var(--line); color: var(--text);
+    border-radius: 10px; padding: 12px; font-size: 14.5px; font-weight: 700; cursor: pointer;
+  }
+  .addbtn:active { background: var(--orange); color: #1a0d00; }
+
+  .toggle { display: flex; align-items: center; gap: 10px; margin: 16px 2px; font-size: 14px; color: var(--muted); }
   .toggle input { width: 20px; height: 20px; accent-color: var(--orange); }
 
-  .selected { display: flex; flex-wrap: wrap; gap: 8px; }
-  .chip { background: var(--card2); border-radius: 20px; padding: 6px 12px; font-size: 13px;
-    display: flex; align-items: center; gap: 8px; }
-  .chip b { color: var(--orange); }
-  .chip span { cursor: pointer; color: var(--muted); font-weight: 700; }
+  /* ---------- selected list ---------- */
+  .sel-list { display: flex; flex-direction: column; gap: 8px; }
+  .sel-row {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 10px 12px; display: flex; align-items: center; gap: 10px;
+  }
+  .sel-row .sname { flex: 1; font-size: 14px; font-weight: 600; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sel-row .sdims { font-size: 11px; color: var(--muted); font-weight: 400; display: block; }
+  .sel-row .x { background: none; border: none; color: var(--muted); font-size: 17px;
+    cursor: pointer; padding: 4px 6px; }
+  .empty { color: var(--muted); font-size: 13.5px; padding: 6px 2px; }
 
-  .bar { background: var(--card); border-radius: 8px; height: 14px; overflow: hidden; border: 1px solid var(--line); }
-  .bar > div { height: 100%; background: linear-gradient(90deg, var(--orange), var(--orange-dark)); }
-  .bar.over > div { background: var(--red); }
+  /* ---------- results ---------- */
+  .reco { border-radius: var(--radius); padding: 20px; margin-bottom: 14px; display: flex;
+    gap: 18px; align-items: center; box-shadow: var(--shadow); }
+  .reco.ok { background: linear-gradient(150deg, rgba(34,197,94,.16), rgba(34,197,94,.05));
+    border: 1px solid rgba(34,197,94,.55); }
+  .reco.no { background: linear-gradient(150deg, rgba(239,68,68,.16), rgba(239,68,68,.05));
+    border: 1px solid rgba(239,68,68,.55); }
+  .reco .gauge { flex-shrink: 0; width: 96px; height: 96px; position: relative; }
+  .reco .gauge svg { transform: rotate(-90deg); }
+  .reco .gauge .pct {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; font-weight: 800; font-size: 20px;
+  }
+  .reco .gauge .pct small { font-size: 9px; color: var(--muted); font-weight: 600;
+    text-transform: uppercase; letter-spacing: .5px; }
+  .reco .label { font-size: 12px; font-weight: 700; letter-spacing: .6px;
+    text-transform: uppercase; }
+  .reco.ok .label { color: #4ade80; } .reco.no .label { color: #f87171; }
+  .reco .big { font-size: 23px; font-weight: 800; margin: 3px 0 5px; letter-spacing: -.3px; }
+  .reco .sub { font-size: 13px; color: var(--muted); line-height: 1.5; }
 
-  #result { margin-top: 8px; }
-  .reco { border-radius: 16px; padding: 18px; margin-bottom: 16px; }
-  .reco.ok { background: rgba(22,163,74,.12); border: 1px solid var(--green); }
-  .reco.no { background: rgba(220,38,38,.12); border: 1px solid var(--red); }
-  .reco .big { font-size: 22px; font-weight: 800; margin: 4px 0 6px; }
-  .reco.ok .big { color: #4ade80; } .reco.no .big { color: #f87171; }
-  .reco .sub { font-size: 13px; color: var(--muted); }
+  /* ---------- load plan ---------- */
+  .plan { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 16px; margin-bottom: 14px; }
+  .plan-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+    margin-bottom: 6px; flex-wrap: wrap; }
+  .plan-head .ptitle { font-weight: 700; font-size: 15px; }
+  .plan-head .pstep { font-size: 12.5px; color: var(--orange); font-weight: 600; }
+  #planCanvas { width: 100%; height: 340px; display: block; touch-action: pan-y; }
+  .plan input[type=range] {
+    width: 100%; margin: 10px 0 4px; accent-color: var(--orange); height: 26px;
+  }
+  .legend { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
+  .lg { display: flex; align-items: center; gap: 6px; background: var(--card2);
+    border-radius: 999px; padding: 4px 11px 4px 6px; font-size: 12px; }
+  .lg i { width: 13px; height: 13px; border-radius: 4px; display: inline-block; }
+  .plan .hint { font-size: 11.5px; color: var(--muted); margin: 8px 0 0; line-height: 1.5; }
 
-  .tcard { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+  /* ---------- trailer cards ---------- */
+  .tcard { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 14px; margin-bottom: 10px; }
   .tcard .top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-  .tcard .tname { font-weight: 600; font-size: 15px; }
-  .tcard .verdict { font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 20px; }
-  .verdict.yes { background: rgba(22,163,74,.2); color: #4ade80; }
-  .verdict.no { background: rgba(220,38,38,.2); color: #f87171; }
-  .tcard .meta { font-size: 12px; color: var(--muted); margin: 6px 0; }
-  .tcard .blockers { font-size: 12px; color: #fca5a5; margin-top: 6px; }
+  .tcard .tname { font-weight: 700; font-size: 15px; }
+  .verdict { font-size: 11px; font-weight: 800; padding: 4px 11px; border-radius: 999px;
+    letter-spacing: .5px; flex-shrink: 0; }
+  .verdict.yes { background: rgba(34,197,94,.18); color: #4ade80; }
+  .verdict.no { background: rgba(239,68,68,.18); color: #f87171; }
+  .tcard .meta { font-size: 12.5px; color: var(--muted); margin: 7px 0; }
+  .bar { background: var(--bg); border-radius: 8px; height: 12px; overflow: hidden;
+    border: 1px solid var(--line); }
+  .bar > div { height: 100%; border-radius: 7px;
+    background: linear-gradient(90deg, var(--orange), var(--orange2));
+    transition: width .7s cubic-bezier(.2,.8,.2,1); }
+  .bar.over > div { background: var(--red); }
+  .tcard .blockers { font-size: 12.5px; color: #fca5a5; margin-top: 8px; line-height: 1.55; }
+  .viewplan { margin-top: 10px; background: none; border: 1px solid var(--line); color: var(--orange);
+    border-radius: 9px; padding: 8px 14px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .viewplan:active { background: rgba(255,122,24,.12); }
 
+  .disclaimer { font-size: 11.5px; color: var(--muted); margin-top: 22px; line-height: 1.6; }
+
+  /* ---------- footbar ---------- */
   .footbar {
-    position: fixed; bottom: 0; left: 0; right: 0; padding: 12px 16px;
-    background: rgba(15,23,42,.96); backdrop-filter: blur(8px); border-top: 1px solid var(--line);
-    display: flex; gap: 12px; align-items: center;
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    background: rgba(11,16,32,.92); backdrop-filter: blur(12px);
+    border-top: 1px solid var(--line); display: flex; gap: 14px; align-items: center;
   }
-  .footbar .tally { font-size: 13px; color: var(--muted); flex: 1; }
-  .footbar .tally b { color: var(--text); }
+  .footbar .tally { font-size: 12.5px; color: var(--muted); flex: 1; line-height: 1.55; }
+  .footbar .tally b { color: var(--text); font-size: 14px; }
   .go {
-    background: var(--orange); color: #fff; border: none; border-radius: 12px;
-    padding: 14px 22px; font-size: 16px; font-weight: 700; cursor: pointer; min-width: 150px;
+    background: linear-gradient(135deg, var(--orange), var(--orange2)); color: #fff;
+    border: none; border-radius: 13px; padding: 15px 24px; font-size: 15.5px; font-weight: 800;
+    cursor: pointer; min-width: 168px; font-family: Sora, Inter, sans-serif;
+    box-shadow: 0 6px 20px rgba(255,90,0,.35); transition: transform .1s, opacity .2s;
   }
-  .go:disabled { opacity: .5; }
-  .disclaimer { font-size: 11px; color: var(--muted); margin-top: 18px; line-height: 1.5; }
+  .go:active { transform: scale(.97); }
+  .go:disabled { opacity: .45; box-shadow: none; cursor: default; }
+
+  /* ---------- toast ---------- */
+  #toast {
+    position: fixed; left: 50%; bottom: 100px; transform: translateX(-50%) translateY(20px);
+    background: var(--card2); border: 1px solid var(--line); color: var(--text);
+    padding: 12px 20px; border-radius: 12px; font-size: 14px; opacity: 0; z-index: 30;
+    pointer-events: none; transition: opacity .25s, transform .25s; box-shadow: var(--shadow);
+    max-width: 86vw;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 480px) {
+    .grid { grid-template-columns: repeat(2, 1fr); }
+    .reco { flex-direction: column; text-align: center; }
+    .hero svg { width: 64px; height: 48px; }
+  }
 </style>
 </head>
 <body>
-<header>
-  <h1>📦 U-Haul Trailer Optimizer</h1>
-  <p>Pick your furniture — we'll find the smallest trailer it fits in.</p>
+
+<header class="hero">
+  <div class="hero-inner">
+    <svg width="84" height="60" viewBox="0 0 84 60" fill="none" aria-hidden="true">
+      <rect x="4" y="8" width="56" height="34" rx="4" fill="#1f2940" stroke="#ff7a18" stroke-width="2.5"/>
+      <path d="M60 26 H76 L80 36 V42 H60 Z" fill="#1f2940" stroke="#ff7a18" stroke-width="2.5" stroke-linejoin="round"/>
+      <circle cx="22" cy="48" r="7" fill="#0b1020" stroke="#8b96b5" stroke-width="2.5"/>
+      <circle cx="68" cy="48" r="7" fill="#0b1020" stroke="#8b96b5" stroke-width="2.5"/>
+      <rect x="12" y="16" width="13" height="11" rx="1.5" fill="#ff7a18" opacity=".85"/>
+      <rect x="28" y="16" width="13" height="11" rx="1.5" fill="#ff7a18" opacity=".55"/>
+      <rect x="12" y="30" width="13" height="9" rx="1.5" fill="#ff7a18" opacity=".4"/>
+    </svg>
+    <div>
+      <h1>Trailer <em>Space Optimizer</em></h1>
+      <p>Pick your furniture and we'll 3D-pack it to find the smallest U-Haul trailer that fits — with a load plan to match.</p>
+    </div>
+  </div>
 </header>
 
-<div class="wrap">
-  <input class="search" id="search" placeholder="Search furniture…" oninput="renderCatalog()">
+<main class="wrap">
+  <h2>Quick start</h2>
+  <div class="presets">
+    <button class="preset" data-preset="dorm">🎓 Dorm room</button>
+    <button class="preset" data-preset="studio">🏠 Studio</button>
+    <button class="preset" data-preset="onebed">🛏️ 1-Bedroom</button>
+    <button class="preset ghost" id="clearAll">✕ Clear all</button>
+  </div>
 
   <h2>Furniture catalog</h2>
+  <input class="search" id="search" placeholder="Search furniture…" autocomplete="off">
+  <div class="pills" id="pills"></div>
   <div class="grid" id="catalog"></div>
 
-  <h2>Add a custom item</h2>
-  <div class="row">
-    <input id="c_name" placeholder="Name">
-  </div>
-  <div class="row" style="margin-top:8px">
-    <input id="c_l" type="number" inputmode="decimal" placeholder="Length in">
-    <input id="c_w" type="number" inputmode="decimal" placeholder="Width in">
-    <input id="c_h" type="number" inputmode="decimal" placeholder="Height in">
-    <input id="c_wt" type="number" inputmode="decimal" placeholder="Lbs">
-    <button class="addbtn" onclick="addCustom()">Add</button>
-  </div>
+  <h2>Custom item</h2>
+  <details class="custom">
+    <summary>📐 Add something that's not in the catalog</summary>
+    <div class="custom-body">
+      <input id="c_name" placeholder="Name (e.g. Antique hutch)">
+      <div class="row">
+        <input id="c_l" type="number" inputmode="decimal" min="1" placeholder="Length (in)">
+        <input id="c_w" type="number" inputmode="decimal" min="1" placeholder="Width (in)">
+        <input id="c_h" type="number" inputmode="decimal" min="1" placeholder="Height (in)">
+      </div>
+      <div class="row">
+        <input id="c_wt" type="number" inputmode="decimal" min="0" placeholder="Weight (lbs, optional)">
+        <input id="c_qty" type="number" inputmode="numeric" min="1" value="1" placeholder="Qty">
+      </div>
+      <div class="flags">
+        <label><input type="checkbox" id="c_upright"> Must stay upright</label>
+        <label><input type="checkbox" id="c_nostack"> Nothing on top</label>
+      </div>
+      <button class="addbtn" id="addCustom">Add to my load</button>
+    </div>
+  </details>
 
-  <div class="toggle">
+  <label class="toggle">
     <input type="checkbox" id="enclosed">
-    <label for="enclosed">Enclosed (weatherproof) trailers only</label>
-  </div>
+    Enclosed (weatherproof) trailers only
+  </label>
 
-  <h2>Selected items</h2>
-  <div class="selected" id="selected"><span class="sub" style="color:var(--muted);font-size:13px">Nothing selected yet.</span></div>
+  <h2>My load</h2>
+  <div class="sel-list" id="selected"></div>
 
   <div id="result"></div>
 
   <p class="disclaimer">
-    Estimates use a 3D packing heuristic — a real, careful load may do a little better or worse.
-    Trailer dimensions are approximate; confirm exact specs and weight limits at uhaul.com,
-    and measure tight pieces. Pack heavy, flat items low; stand sofas and mattresses on edge.
+    Estimates use a 3D packing heuristic — a careful real-world load may do slightly better or
+    worse. Trailer dimensions are approximate; confirm exact specs and weight limits at
+    uhaul.com and measure your tightest pieces. Load heavy, flat items first and low; stand
+    sofas and mattresses on edge; put ~60% of the weight in the front half of the trailer.
   </p>
-</div>
+</main>
 
 <div class="footbar">
-  <div class="tally"><b id="t_count">0</b> items · <b id="t_vol">0</b> cu ft · <b id="t_wt">0</b> lbs</div>
-  <button class="go" id="go" onclick="optimize()" disabled>Find my trailer</button>
+  <div class="tally">
+    <b id="t_count">0</b> items<br>
+    <b id="t_vol">0</b> cu ft · <b id="t_wt">0</b> lbs
+  </div>
+  <button class="go" id="go" disabled>Find my trailer&ensp;🚚</button>
 </div>
 
+<div id="toast"></div>
+
 <script>
+"use strict";
 const CATALOG = {{ catalog | tojson }};
-// state: slug/customId -> { item, qty }
-const picked = new Map();
+
+const EMOJI = {
+  twin_mattress:"🛏️", full_mattress:"🛏️", queen_mattress:"🛏️", king_mattress:"🛏️",
+  box_spring_queen:"🛏️", bed_frame:"🔩", nightstand:"🗃️", dresser:"🗄️", tall_dresser:"🚪",
+  sofa:"🛋️", loveseat:"🛋️", armchair:"🪑", coffee_table:"☕", tv_stand:"📺", tv_55:"📺",
+  bookshelf:"📚", floor_lamp:"💡", dining_table:"🍽️", dining_chair:"🪑", bar_stool:"🥤",
+  refrigerator:"🧊", washer:"🌀", dryer:"🧺", microwave:"♨️", desk:"🖥️", office_chair:"💺",
+  filing_cabinet:"🗄️", box_small:"📦", box_medium:"📦", box_large:"📦",
+};
+
+const PRESETS = {
+  dorm:   { twin_mattress:1, desk:1, office_chair:1, bookshelf:1, box_medium:4, box_small:4 },
+  studio: { full_mattress:1, bed_frame:1, dresser:1, loveseat:1, coffee_table:1, tv_55:1,
+            box_medium:6, box_large:4 },
+  onebed: { queen_mattress:1, bed_frame:1, dresser:1, nightstand:1, sofa:1, coffee_table:1,
+            tv_55:1, dining_chair:2, box_large:6, box_medium:4 },
+};
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = n => Math.round(n).toLocaleString();
+
+// state: key (slug or custom_N) -> { item, qty, custom }
+let picked = new Map();
 let customSeq = 0;
+let activeCategory = "All";
+let plans = {};        // trailer name -> { container, placements }
+let currentPlan = null;
 
-function fmt(n) { return Math.round(n).toLocaleString(); }
+/* ---------- persistence ---------- */
+function save() {
+  try {
+    localStorage.setItem("uhaul_load_v1", JSON.stringify({
+      entries: [...picked.entries()],
+      customSeq,
+      enclosed: $("enclosed").checked,
+    }));
+  } catch (e) { /* private mode: ignore */ }
+}
+function restore() {
+  try {
+    const raw = localStorage.getItem("uhaul_load_v1");
+    if (!raw) return;
+    const d = JSON.parse(raw);
+    picked = new Map(d.entries || []);
+    customSeq = d.customSeq || 0;
+    $("enclosed").checked = !!d.enclosed;
+  } catch (e) { picked = new Map(); }
+}
 
+/* ---------- toast ---------- */
+let toastTimer = null;
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
+}
+
+/* ---------- catalog ---------- */
+function categories() {
+  return ["All", ...new Set(CATALOG.map(c => c.category))];
+}
+function renderPills() {
+  $("pills").innerHTML = categories().map(c =>
+    `<button class="pill ${c === activeCategory ? "on" : ""}" data-cat="${esc(c)}">${esc(c)}</button>`
+  ).join("");
+  $("pills").querySelectorAll(".pill").forEach(b =>
+    b.onclick = () => { activeCategory = b.dataset.cat; renderPills(); renderCatalog(); });
+}
 function renderCatalog() {
-  const q = document.getElementById('search').value.trim().toLowerCase();
-  const box = document.getElementById('catalog');
-  box.innerHTML = '';
-  CATALOG.filter(c => !q || c.name.toLowerCase().includes(q) || c.slug.includes(q)).forEach(c => {
-    const qty = picked.get(c.slug)?.qty || 0;
-    const el = document.createElement('div');
-    el.className = 'item' + (qty ? ' active' : '');
-    el.innerHTML = `
-      <div class="name">${c.name}</div>
-      <div class="dims">${c.length}×${c.width}×${c.height}" · ${c.volume} cu ft</div>
-      <div class="stepper">
-        <button aria-label="remove">−</button>
-        <span class="qty">${qty}</span>
-        <button aria-label="add">+</button>
-      </div>`;
-    const [minus, , plus] = el.querySelectorAll('button, .qty');
-    el.querySelectorAll('button')[0].onclick = () => bump(c, -1);
-    el.querySelectorAll('button')[1].onclick = () => bump(c, +1);
-    box.appendChild(el);
-  });
+  const q = $("search").value.trim().toLowerCase();
+  const box = $("catalog");
+  box.innerHTML = "";
+  CATALOG
+    .filter(c => activeCategory === "All" || c.category === activeCategory)
+    .filter(c => !q || c.name.toLowerCase().includes(q) || c.slug.includes(q))
+    .forEach(c => {
+      const qty = picked.get(c.slug)?.qty || 0;
+      const el = document.createElement("div");
+      el.className = "item" + (qty ? " active" : "");
+      el.innerHTML = `
+        ${qty ? `<div class="qty-badge">${qty}</div>` : ""}
+        <div class="emoji">${EMOJI[c.slug] || "📦"}</div>
+        <div class="name">${esc(c.name)}</div>
+        <div class="dims">${c.length}×${c.width}×${c.height}" · ${c.volume} cu ft</div>
+        <div class="stepper">
+          <button aria-label="remove one">−</button>
+          <span class="qty">${qty}</span>
+          <button aria-label="add one">+</button>
+        </div>`;
+      const [minus, plus] = el.querySelectorAll("button");
+      minus.onclick = e => { e.stopPropagation(); bump(c, -1); };
+      plus.onclick  = e => { e.stopPropagation(); bump(c, +1); };
+      el.onclick = () => bump(c, +1);   // tap anywhere on the card to add
+      box.appendChild(el);
+    });
 }
-
 function bump(c, delta) {
-  const cur = picked.get(c.slug);
-  const qty = (cur?.qty || 0) + delta;
+  const qty = (picked.get(c.slug)?.qty || 0) + delta;
   if (qty <= 0) picked.delete(c.slug);
-  else picked.set(c.slug, { item: { slug: c.slug, name: c.name, volume: c.volume, weight: c.weight, quantity: qty }, qty });
+  else picked.set(c.slug, {
+    item: { slug: c.slug, name: c.name, length: c.length, width: c.width, height: c.height,
+            volume: c.volume, weight: c.weight, quantity: qty },
+    qty,
+  });
   refresh();
 }
 
+/* ---------- custom items ---------- */
 function addCustom() {
-  const name = document.getElementById('c_name').value.trim() || 'Custom item';
-  const l = parseFloat(document.getElementById('c_l').value);
-  const w = parseFloat(document.getElementById('c_w').value);
-  const h = parseFloat(document.getElementById('c_h').value);
-  const wt = parseFloat(document.getElementById('c_wt').value) || 0;
-  if (!(l > 0 && w > 0 && h > 0)) { alert('Enter length, width and height in inches.'); return; }
-  const id = 'custom_' + (customSeq++);
-  const volume = +( (l*w*h)/1728 ).toFixed(1);
-  picked.set(id, { item: { name, length: l, width: w, height: h, weight: wt, volume, quantity: 1 }, qty: 1, custom: true });
-  ['c_name','c_l','c_w','c_h','c_wt'].forEach(i => document.getElementById(i).value = '');
+  const name = $("c_name").value.trim() || "Custom item";
+  const l = parseFloat($("c_l").value), w = parseFloat($("c_w").value),
+        h = parseFloat($("c_h").value);
+  const wt = parseFloat($("c_wt").value) || 0;
+  const qty = Math.max(1, parseInt($("c_qty").value) || 1);
+  if (!(l > 0 && w > 0 && h > 0)) { toast("Enter length, width and height in inches."); return; }
+  const id = "custom_" + (customSeq++);
+  picked.set(id, {
+    item: { name, length: l, width: w, height: h, weight: wt,
+            volume: +((l * w * h) / 1728).toFixed(1), quantity: qty,
+            keep_upright: $("c_upright").checked, stackable: !$("c_nostack").checked },
+    qty, custom: true,
+  });
+  ["c_name","c_l","c_w","c_h","c_wt"].forEach(i => $(i).value = "");
+  $("c_qty").value = 1; $("c_upright").checked = false; $("c_nostack").checked = false;
+  toast(`Added ${name}`);
   refresh();
 }
 
-function removeKey(key) { picked.delete(key); refresh(); }
+/* ---------- presets ---------- */
+function applyPreset(key) {
+  picked = new Map();
+  for (const [slug, qty] of Object.entries(PRESETS[key])) {
+    const c = CATALOG.find(x => x.slug === slug);
+    if (c) bump(c, qty);
+  }
+  toast("Preset loaded — tweak it, then hit Find my trailer.");
+}
 
+/* ---------- selected + tally ---------- */
 function refresh() {
-  const sel = document.getElementById('selected');
+  const sel = $("selected");
   if (picked.size === 0) {
-    sel.innerHTML = '<span style="color:var(--muted);font-size:13px">Nothing selected yet.</span>';
+    sel.innerHTML = `<div class="empty">Nothing yet — tap furniture above or load a preset.</div>`;
   } else {
-    sel.innerHTML = '';
+    sel.innerHTML = "";
     for (const [key, v] of picked) {
-      const chip = document.createElement('div');
-      chip.className = 'chip';
-      chip.innerHTML = `<b>${v.qty}×</b> ${v.item.name} <span>✕</span>`;
-      chip.querySelector('span').onclick = () => removeKey(key);
-      sel.appendChild(chip);
+      const it = v.item;
+      const row = document.createElement("div");
+      row.className = "sel-row";
+      row.innerHTML = `
+        <span style="font-size:18px">${v.custom ? "📐" : (EMOJI[it.slug] || "📦")}</span>
+        <span class="sname">${esc(it.name)}
+          <span class="sdims">${it.length}×${it.width}×${it.height}" · ${(it.volume * v.qty).toFixed(1)} cu ft total</span>
+        </span>
+        <div class="stepper" style="gap:2px">
+          <button aria-label="less">−</button><span class="qty">${v.qty}</span><button aria-label="more">+</button>
+        </div>
+        <button class="x" aria-label="remove">✕</button>`;
+      const [minus, plus] = row.querySelectorAll(".stepper button");
+      minus.onclick = () => { v.qty > 1 ? (v.qty--, v.item.quantity = v.qty) : picked.delete(key); refresh(); };
+      plus.onclick  = () => { v.qty++; v.item.quantity = v.qty; refresh(); };
+      row.querySelector(".x").onclick = () => { picked.delete(key); refresh(); };
+      sel.appendChild(row);
     }
   }
   let count = 0, vol = 0, wt = 0;
-  for (const v of picked.values()) { count += v.qty; vol += v.item.volume * v.qty; wt += (v.item.weight || 0) * v.qty; }
-  document.getElementById('t_count').textContent = count;
-  document.getElementById('t_vol').textContent = fmt(vol);
-  document.getElementById('t_wt').textContent = fmt(wt);
-  document.getElementById('go').disabled = picked.size === 0;
+  for (const v of picked.values()) {
+    count += v.qty; vol += v.item.volume * v.qty; wt += (v.item.weight || 0) * v.qty;
+  }
+  $("t_count").textContent = count;
+  $("t_vol").textContent = fmt(vol);
+  $("t_wt").textContent = fmt(wt);
+  $("go").disabled = picked.size === 0;
   renderCatalog();
+  save();
 }
 
+/* ---------- optimize ---------- */
 async function optimize() {
-  const go = document.getElementById('go');
-  go.disabled = true; go.textContent = 'Calculating…';
+  const go = $("go");
+  go.disabled = true; go.textContent = "Packing…";
   const items = [...picked.values()].map(v => v.item);
   try {
-    const res = await fetch('/api/optimize', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items, enclosed_only: document.getElementById('enclosed').checked }),
+    const res = await fetch("/api/optimize", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items, enclosed_only: $("enclosed").checked }),
     });
     const data = await res.json();
-    if (!res.ok) { alert(data.error || 'Something went wrong.'); return; }
+    if (!res.ok) { toast(data.error || "Something went wrong."); return; }
     renderResult(data);
   } catch (e) {
-    alert('Network error: ' + e.message);
+    toast("Network error: " + e.message);
   } finally {
-    go.disabled = picked.size === 0; go.textContent = 'Find my trailer';
+    go.disabled = picked.size === 0;
+    go.innerHTML = "Find my trailer&ensp;🚚";
   }
 }
 
-function bar(pct, over) {
-  return `<div class="bar ${over ? 'over' : ''}"><div style="width:${Math.min(100, pct)}%"></div></div>`;
+/* ---------- results ---------- */
+function gauge(pct) {
+  const C = 2 * Math.PI * 42;
+  const off = C * (1 - Math.min(100, pct) / 100);
+  return `
+    <div class="gauge">
+      <svg width="96" height="96" viewBox="0 0 96 96">
+        <circle cx="48" cy="48" r="42" stroke="var(--line)" stroke-width="9" fill="none"/>
+        <circle cx="48" cy="48" r="42" stroke="url(#ggrad)" stroke-width="9" fill="none"
+          stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C}"
+          style="transition: stroke-dashoffset 1s cubic-bezier(.2,.8,.2,1)" data-off="${off}"/>
+        <defs><linearGradient id="ggrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#ff7a18"/><stop offset="1" stop-color="#ffb068"/>
+        </linearGradient></defs>
+      </svg>
+      <div class="pct">${pct}%<small>full</small></div>
+    </div>`;
 }
 
 function renderResult(d) {
-  const r = document.getElementById('result');
-  let html = '<h2>Recommendation</h2>';
+  plans = {};
+  d.evaluations.forEach(e => {
+    if (e.fits && e.placements.length) {
+      plans[e.trailer] = { container: e.container, placements: e.placements };
+    }
+  });
+
+  const r = $("result");
+  let html = `<h2>Recommendation</h2>`;
   if (d.recommended) {
     const t = d.recommended;
-    html += `<div class="reco ok">
-      <div class="sub">✅ Smallest trailer that fits everything</div>
-      <div class="big">${t.trailer}</div>
-      <div class="sub">${t.summary}</div>
-      <div style="margin:10px 0">${bar(t.utilization, false)}</div>
-      <div class="sub">Packs to ~${t.utilization}% of capacity · ${t.note}</div>
-    </div>`;
+    html += `
+      <div class="reco ok">
+        ${gauge(t.utilization)}
+        <div>
+          <div class="label">✓ Smallest trailer that fits everything</div>
+          <div class="big">${esc(t.trailer)}</div>
+          <div class="sub">${esc(t.summary)}<br>${esc(t.note)}</div>
+        </div>
+      </div>`;
   } else {
-    html += `<div class="reco no">
-      <div class="big">No single trailer fits it all</div>
-      <div class="sub">Your ${fmt(d.total_volume)} cu ft load is more than any catalog trailer.
-      Consider a moving truck (10'–26'), two trips, or paring down.</div>
-    </div>`;
+    html += `
+      <div class="reco no">
+        <div>
+          <div class="label">✗ No single trailer fits it all</div>
+          <div class="big">Time for plan B</div>
+          <div class="sub">Your ${fmt(d.total_volume)} cu ft / ${fmt(d.total_weight)} lbs load
+          is more than any U-Haul trailer holds. Consider a moving truck (10'–26'),
+          two trips, or paring the list down.</div>
+        </div>
+      </div>`;
   }
 
-  html += '<h2>Every trailer</h2>';
+  if (d.recommended && plans[d.recommended.trailer]) {
+    html += `
+      <div class="plan">
+        <div class="plan-head">
+          <span class="ptitle">📋 Load plan — <span id="planName">${esc(d.recommended.trailer)}</span></span>
+          <span class="pstep" id="planStepLabel"></span>
+        </div>
+        <canvas id="planCanvas"></canvas>
+        <input type="range" id="planStep" min="1" value="1">
+        <div class="legend" id="planLegend"></div>
+        <p class="hint">Drag the slider to step through the loading order — items go in
+        biggest-first, floor-first, starting at the hitch end (back-left of the drawing).</p>
+      </div>`;
+  }
+
+  html += `<h2>Every trailer, smallest first</h2>`;
   d.evaluations.forEach(e => {
-    html += `<div class="tcard">
-      <div class="top">
-        <span class="tname">${e.trailer}</span>
-        <span class="verdict ${e.fits ? 'yes' : 'no'}">${e.fits ? 'FITS' : 'NO'}</span>
-      </div>
-      <div class="meta">${e.summary}</div>
-      ${bar(e.utilization, e.utilization > 100)}
-      <div class="meta">${e.utilization}% full${e.fits && e.note ? ' · ' + e.note : ''}</div>
-      ${e.fits ? '' : '<div class="blockers">• ' + e.blockers.join('<br>• ') + '</div>'}
-    </div>`;
+    html += `
+      <div class="tcard">
+        <div class="top">
+          <span class="tname">${esc(e.trailer)}</span>
+          <span class="verdict ${e.fits ? "yes" : "no"}">${e.fits ? "FITS" : "NO FIT"}</span>
+        </div>
+        <div class="meta">${esc(e.summary)}</div>
+        <div class="bar ${e.utilization > 100 ? "over" : ""}"><div style="width:0%" data-w="${Math.min(100, e.utilization)}"></div></div>
+        <div class="meta">${e.utilization}% full${e.fits && e.note ? " · " + esc(e.note) : ""}</div>
+        ${e.fits ? "" : `<div class="blockers">• ${e.blockers.map(esc).join("<br>• ")}</div>`}
+        ${e.fits && plans[e.trailer] ? `<button class="viewplan" data-trailer="${esc(e.trailer)}">View load plan ↑</button>` : ""}
+      </div>`;
   });
   r.innerHTML = html;
-  r.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  // Kick off entrance animations after layout.
+  requestAnimationFrame(() => {
+    r.querySelectorAll(".bar > div").forEach(b => b.style.width = b.dataset.w + "%");
+    const g = r.querySelector(".gauge circle[data-off]");
+    if (g) g.style.strokeDashoffset = g.dataset.off;
+  });
+
+  r.querySelectorAll(".viewplan").forEach(b =>
+    b.onclick = () => {
+      setPlan(b.dataset.trailer);
+      $("planName") && ( $("planName").textContent = b.dataset.trailer );
+      document.querySelector(".plan")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+
+  if (d.recommended && plans[d.recommended.trailer]) {
+    setPlan(d.recommended.trailer);
+    const slider = $("planStep");
+    slider.oninput = () => drawCurrentPlan(+slider.value);
+  }
+  r.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-renderCatalog();
+/* ---------- isometric load plan ---------- */
+function colorFor(idx) {
+  const h = (idx * 137.508) % 360;   // golden-angle hues stay distinct
+  return {
+    top:  `hsl(${h} 70% 66%)`,
+    side: `hsl(${h} 65% 52%)`,
+    dark: `hsl(${h} 60% 38%)`,
+    line: `hsl(${h} 50% 22%)`,
+  };
+}
+const baseName = n => n.replace(/ #\d+$/, "");
+
+function setPlan(trailerName) {
+  currentPlan = plans[trailerName];
+  if (!currentPlan) return;
+  const n = currentPlan.placements.length;
+  const slider = $("planStep");
+  if (slider) { slider.max = n; slider.value = n; }
+  // Legend with stable colors per distinct item.
+  const names = [];
+  currentPlan.placements.forEach(p => {
+    const b = baseName(p.name);
+    if (!names.includes(b)) names.push(b);
+  });
+  currentPlan.colorIndex = Object.fromEntries(names.map((b, i) => [b, i]));
+  const counts = {};
+  currentPlan.placements.forEach(p => counts[baseName(p.name)] = (counts[baseName(p.name)] || 0) + 1);
+  const lg = $("planLegend");
+  if (lg) lg.innerHTML = names.map(b => {
+    const c = colorFor(currentPlan.colorIndex[b]);
+    return `<span class="lg"><i style="background:${c.side}"></i>${esc(b)}${counts[b] > 1 ? " ×" + counts[b] : ""}</span>`;
+  }).join("");
+  drawCurrentPlan(n);
+}
+
+function drawCurrentPlan(upto) {
+  if (!currentPlan) return;
+  const canvas = $("planCanvas");
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = canvas.clientWidth || canvas.parentElement.clientWidth - 32;
+  const cssH = 340;
+  canvas.width = cssW * dpr; canvas.height = cssH * dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, cssW, cssH);
+
+  const { length: L, width: W, height: H } = currentPlan.container;
+  const cos30 = Math.cos(Math.PI / 6);
+  const proj = (x, y, z) => [(y - x) * cos30, (x + y) * 0.5 - z];
+
+  // Fit the container's projected bounding box into the canvas.
+  let minU = 1e9, maxU = -1e9, minV = 1e9, maxV = -1e9;
+  for (const x of [0, L]) for (const y of [0, W]) for (const z of [0, H]) {
+    const [u, v] = proj(x, y, z);
+    minU = Math.min(minU, u); maxU = Math.max(maxU, u);
+    minV = Math.min(minV, v); maxV = Math.max(maxV, v);
+  }
+  const pad = 26;
+  const scale = Math.min((cssW - 2 * pad) / (maxU - minU), (cssH - 2 * pad) / (maxV - minV));
+  const ox = (cssW - (maxU - minU) * scale) / 2 - minU * scale;
+  const oy = (cssH - (maxV - minV) * scale) / 2 - minV * scale;
+  const P = (x, y, z) => { const [u, v] = proj(x, y, z); return [u * scale + ox, v * scale + oy]; };
+
+  const poly = (pts, fill, stroke) => {
+    ctx.beginPath();
+    ctx.moveTo(...pts[0]);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(...pts[i]);
+    ctx.closePath();
+    if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+    if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); }
+  };
+
+  // Container shell: floor + the two far walls (planes x=0 and y=0).
+  poly([P(0,0,0), P(L,0,0), P(L,W,0), P(0,W,0)], "rgba(255,255,255,.045)", "rgba(255,255,255,.18)");
+  poly([P(0,0,0), P(L,0,0), P(L,0,H), P(0,0,H)], "rgba(255,255,255,.025)", "rgba(255,255,255,.12)");
+  poly([P(0,0,0), P(0,W,0), P(0,W,H), P(0,0,H)], "rgba(255,255,255,.025)", "rgba(255,255,255,.12)");
+
+  // Boxes: slice by loading order, then painter-sort far/low -> near/high.
+  const visible = currentPlan.placements.slice(0, upto);
+  const sorted = [...visible].sort((a, b) => (a.x + a.y + a.z) - (b.x + b.y + b.z));
+  for (const p of sorted) {
+    const c = colorFor(currentPlan.colorIndex[baseName(p.name)] || 0);
+    const { x, y, z, l, w, h } = p;
+    poly([P(x,y,z+h), P(x+l,y,z+h), P(x+l,y+w,z+h), P(x,y+w,z+h)], c.top,  c.line); // top
+    poly([P(x,y+w,z), P(x+l,y+w,z), P(x+l,y+w,z+h), P(x,y+w,z+h)], c.side, c.line); // +y face
+    poly([P(x+l,y,z), P(x+l,y+w,z), P(x+l,y+w,z+h), P(x+l,y,z+h)], c.dark, c.line); // +x face
+  }
+
+  // Near vertical edges of the container redrawn faintly on top for depth.
+  ctx.strokeStyle = "rgba(255,255,255,.14)"; ctx.lineWidth = 1;
+  for (const [x, y] of [[L, 0], [0, W], [L, W]]) {
+    ctx.beginPath(); ctx.moveTo(...P(x, y, 0)); ctx.lineTo(...P(x, y, H)); ctx.stroke();
+  }
+
+  // Hitch label at the far corner.
+  ctx.fillStyle = "rgba(139,150,181,.85)"; ctx.font = "11px Inter, sans-serif";
+  const [hx, hy] = P(0, 0, H);
+  ctx.fillText("⬑ hitch end", hx - 30, hy - 8);
+
+  const label = $("planStepLabel");
+  if (label) {
+    const n = currentPlan.placements.length;
+    label.textContent = upto >= n
+      ? `All ${n} items loaded`
+      : `Step ${upto}/${n}: ${currentPlan.placements[upto - 1].name}`;
+  }
+}
+
+window.addEventListener("resize", () => {
+  if (currentPlan && $("planStep")) drawCurrentPlan(+$("planStep").value);
+});
+
+/* ---------- wire up ---------- */
+$("search").oninput = renderCatalog;
+$("go").onclick = optimize;
+$("addCustom").onclick = addCustom;
+$("enclosed").onchange = save;
+$("clearAll").onclick = () => { picked = new Map(); $("result").innerHTML = ""; refresh(); };
+document.querySelectorAll(".preset[data-preset]").forEach(b =>
+  b.onclick = () => applyPreset(b.dataset.preset));
+
+restore();
+renderPills();
+refresh();
 </script>
 </body>
 </html>

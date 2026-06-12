@@ -1,8 +1,15 @@
 """Flask web app for the U-Haul space optimizer (mobile-friendly)."""
 
+import os
+
 from flask import Flask, render_template, request, jsonify
 
-from uhaul_optimizer.furniture import FURNITURE_CATALOG, FurnitureItem, get_catalog_item
+from uhaul_optimizer.furniture import (
+    FURNITURE_CATALOG,
+    FURNITURE_CATEGORIES,
+    FurnitureItem,
+    get_catalog_item,
+)
 from uhaul_optimizer.optimizer import find_minimum_trailer
 from uhaul_optimizer.trailers import UHAUL_TRAILERS
 
@@ -16,6 +23,7 @@ def index():
         {
             "slug": slug,
             "name": item.name,
+            "category": FURNITURE_CATEGORIES.get(slug, "Other"),
             "length": item.length,
             "width": item.width,
             "height": item.height,
@@ -72,7 +80,7 @@ def optimize():
     rec = find_minimum_trailer(items, enclosed_only=enclosed_only)
 
     def fit_dict(ev):
-        return {
+        d = {
             "trailer": ev.trailer.name,
             "fits": ev.fits,
             "enclosed": ev.trailer.enclosed,
@@ -82,7 +90,23 @@ def optimize():
             "summary": ev.trailer.summary(),
             "note": ev.trailer.note,
             "blockers": ev.blockers,
+            "container": {
+                "length": ev.trailer.length,
+                "width": ev.trailer.width,
+                "height": ev.trailer.height,
+            },
+            # Placement coordinates power the load-plan diagram; only fitting
+            # trailers have a complete (and therefore meaningful) arrangement.
+            "placements": [
+                {
+                    "name": p.name,
+                    "x": p.box.x, "y": p.box.y, "z": p.box.z,
+                    "l": p.box.length, "w": p.box.width, "h": p.box.height,
+                }
+                for p in ev.pack_result.placements
+            ] if ev.fits else [],
         }
+        return d
 
     return jsonify({
         "total_volume": round(rec.total_volume_cuft),
@@ -94,4 +118,5 @@ def optimize():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001, debug=True)
+    port = int(os.environ.get("PORT", "5001"))
+    app.run(host="0.0.0.0", port=port, debug=True)

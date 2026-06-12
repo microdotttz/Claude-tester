@@ -58,7 +58,8 @@ FURNITURE_CATALOG: dict[str, FurnitureItem] = {
     "bed_frame": FurnitureItem("Bed frame (disassembled)", 80, 12, 8, 60),
     "nightstand": FurnitureItem("Nightstand", 24, 18, 26, 30, keep_upright=True),
     "dresser": FurnitureItem("Dresser", 60, 20, 34, 120, keep_upright=True),
-    "tall_dresser": FurnitureItem("Tall dresser / armoire", 40, 22, 60, 160, keep_upright=True),
+    # Taller pieces ride on their backs in a trailer, so they may rotate freely.
+    "tall_dresser": FurnitureItem("Tall dresser / armoire", 40, 22, 60, 160),
     # Living room
     "sofa": FurnitureItem("Sofa (3-seat)", 84, 38, 34, 150, keep_upright=True),
     "loveseat": FurnitureItem("Loveseat", 60, 38, 34, 110, keep_upright=True),
@@ -66,7 +67,7 @@ FURNITURE_CATALOG: dict[str, FurnitureItem] = {
     "coffee_table": FurnitureItem("Coffee table", 48, 24, 18, 40),
     "tv_stand": FurnitureItem("TV stand", 60, 18, 24, 70, keep_upright=True),
     "tv_55": FurnitureItem('55" flat-screen TV (boxed)', 52, 8, 32, 45, keep_upright=True, stackable=False),
-    "bookshelf": FurnitureItem("Bookshelf", 36, 12, 72, 80, keep_upright=True),
+    "bookshelf": FurnitureItem("Bookshelf", 36, 12, 72, 80),  # rides on its back
     "floor_lamp": FurnitureItem("Floor lamp (broken down)", 60, 8, 8, 12),
     # Dining / kitchen
     "dining_table": FurnitureItem("Dining table", 60, 36, 30, 90, stackable=False),
@@ -87,6 +88,26 @@ FURNITURE_CATALOG: dict[str, FurnitureItem] = {
     "box_small": FurnitureItem("Small box", 16, 12, 12, 25),
     "box_medium": FurnitureItem("Medium box", 18, 18, 16, 35),
     "box_large": FurnitureItem("Large box", 18, 18, 24, 45),
+}
+
+
+# Grouping used by the web catalog UI.
+_CATEGORY_GROUPS: dict[str, list[str]] = {
+    "Bedroom": [
+        "twin_mattress", "full_mattress", "queen_mattress", "king_mattress",
+        "box_spring_queen", "bed_frame", "nightstand", "dresser", "tall_dresser",
+    ],
+    "Living Room": [
+        "sofa", "loveseat", "armchair", "coffee_table", "tv_stand", "tv_55",
+        "bookshelf", "floor_lamp",
+    ],
+    "Dining": ["dining_table", "dining_chair", "bar_stool"],
+    "Appliances": ["refrigerator", "washer", "dryer", "microwave"],
+    "Office": ["desk", "office_chair", "filing_cabinet"],
+    "Boxes": ["box_small", "box_medium", "box_large"],
+}
+FURNITURE_CATEGORIES: dict[str, str] = {
+    slug: cat for cat, slugs in _CATEGORY_GROUPS.items() for slug in slugs
 }
 
 
