@@ -186,7 +186,11 @@ The app gives you:
 - An **interactive isometric load plan** — drag the slider to step through the
   exact loading order the packer computed, plus a tongue-weight balance bar
 - A per-trailer breakdown explaining *why* each trailer does or doesn't fit
-- Your load, collapsed groups, and settings are remembered between launches
+- Your load, collapsed groups, and settings are **saved to disk and restored
+  on the next launch** (via the Python bridge to a per-user app-data file —
+  `~/Library/Application Support/UHaulOptimizer/` on macOS,
+  `%APPDATA%\UHaulOptimizer\` on Windows, `~/.config/UHaulOptimizer/` on Linux).
+  The web version persists the same state in the browser's `localStorage`.
 
 ### Add from a link (auto-dimensions)
 

@@ -397,6 +397,7 @@
 "use strict";
 const CATALOG = {{ catalog | tojson }};
 const LOVESAC = {{ lovesac | tojson }};
+const DESKTOP = {{ desktop|default(false)|tojson }};   // true in the pywebview desktop app
 
 const CATEGORY_ORDER = [...new Set(CATALOG.map(c => c.category))];
 const CATEGORY_EMOJI = {
@@ -434,22 +435,33 @@ let collapsed = new Set();   // category names the user has collapsed
 let plans = {};        // trailer name -> { container, placements }
 let currentPlan = null;
 
-/* ---------- persistence ---------- */
-function save() {
-  try {
-    localStorage.setItem("uhaul_load_v1", JSON.stringify({
-      entries: [...picked.entries()],
-      customSeq,
-      enclosed: $("enclosed").checked,
-      collapsed: [...collapsed],
-    }));
-  } catch (e) { /* private mode: ignore */ }
+/* ---------- persistence ----------
+   Desktop build persists to a file on disk through the Python bridge (the
+   webview's localStorage is in-memory only). Web build uses localStorage. */
+function currentState() {
+  return {
+    entries: [...picked.entries()],
+    customSeq,
+    enclosed: $("enclosed").checked,
+    collapsed: [...collapsed],
+  };
 }
-function restore() {
+function save() {
+  const state = currentState();
+  if (DESKTOP) {
+    try { window.pywebview.api.save_state(state); } catch (e) { /* not ready yet */ }
+  } else {
+    try { localStorage.setItem("uhaul_load_v1", JSON.stringify(state)); } catch (e) {}
+  }
+}
+async function loadState() {
+  if (DESKTOP) {
+    try { return (await window.pywebview.api.load_state()) || {}; } catch (e) { return {}; }
+  }
+  try { return JSON.parse(localStorage.getItem("uhaul_load_v1") || "{}"); } catch (e) { return {}; }
+}
+function applyState(d) {
   try {
-    const raw = localStorage.getItem("uhaul_load_v1");
-    if (!raw) return;
-    const d = JSON.parse(raw);
     picked = new Map(d.entries || []);
     customSeq = d.customSeq || 0;
     collapsed = new Set(d.collapsed || []);
@@ -995,9 +1007,18 @@ $("clearAll").onclick = () => { picked = new Map(); $("result").innerHTML = ""; 
 document.querySelectorAll(".preset[data-preset]").forEach(b =>
   b.onclick = () => applyPreset(b.dataset.preset));
 
-restore();
-renderLovesac();
-refresh();
+async function boot() {
+  applyState(await loadState());
+  renderLovesac();
+  refresh();
+}
+// In the desktop app the bridge may attach a moment after load, so wait for
+// 'pywebviewready' unless it's already here. The web build boots immediately.
+if (DESKTOP && !window.pywebview) {
+  window.addEventListener("pywebviewready", boot, { once: true });
+} else {
+  boot();
+}
 </script>
 </body>
 </html>

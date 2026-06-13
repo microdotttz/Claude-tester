@@ -22,6 +22,7 @@ def index():
         "uhaul.html",
         catalog=catalog_payload(),
         lovesac=lovesac_components_payload(),
+        desktop=False,   # web build persists via the browser's localStorage
     )
 
 

@@ -18,6 +18,8 @@ def test_index_renders_catalog():
     assert r.status_code == 200
     assert b"CATALOG" in r.data
     assert b"category" in r.data  # catalog entries carry UI categories
+    # Web build persists via localStorage, not the desktop bridge.
+    assert b"const DESKTOP = false" in r.data
 
 
 def test_optimize_returns_recommendation_with_placements():

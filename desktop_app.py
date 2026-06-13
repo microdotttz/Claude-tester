@@ -14,7 +14,9 @@ The window's title bar, resizing, and OS integration all come for free; this is
 a genuine desktop application, not a browser tab.
 """
 
+import json
 import os
+import pathlib
 import subprocess
 import sys
 
@@ -28,6 +30,23 @@ APP_TITLE = "U-Haul Space Optimizer"
 _TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
 
 
+def state_file() -> pathlib.Path:
+    """Path to the saved-load file (persists between launches).
+
+    Honors ``UHAUL_STATE_FILE`` (used by tests), else a per-user app-data dir.
+    """
+    override = os.environ.get("UHAUL_STATE_FILE")
+    if override:
+        return pathlib.Path(override)
+    if sys.platform == "darwin":
+        base = pathlib.Path.home() / "Library" / "Application Support"
+    elif os.name == "nt":
+        base = pathlib.Path(os.environ.get("APPDATA", pathlib.Path.home()))
+    else:
+        base = pathlib.Path(os.environ.get("XDG_CONFIG_HOME", pathlib.Path.home() / ".config"))
+    return base / "UHaulOptimizer" / "state.json"
+
+
 def render_html() -> str:
     """Render the UI template to a standalone HTML string with the catalog baked in."""
     env = Environment(
@@ -37,6 +56,7 @@ def render_html() -> str:
     return env.get_template("uhaul.html").render(
         catalog=catalog_payload(),
         lovesac=lovesac_components_payload(),
+        desktop=True,   # tells the page to persist via the bridge, not localStorage
     )
 
 
@@ -72,6 +92,24 @@ class Api:
             return {"error": str(e)}
         except Exception:
             return {"error": "Couldn't reach or read that page. Enter the size by hand."}
+
+    def load_state(self) -> dict:
+        """Return the saved load from disk (empty dict if none/unreadable)."""
+        path = state_file()
+        try:
+            return json.loads(path.read_text())
+        except (OSError, ValueError):
+            return {}
+
+    def save_state(self, state: dict | None = None) -> bool:
+        """Persist the current load to disk so it survives relaunches."""
+        path = state_file()
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(state or {}))
+            return True
+        except OSError:
+            return False
 
 
 def _ensure_pywebview():

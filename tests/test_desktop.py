@@ -109,6 +109,46 @@ def test_api_optimize_enclosed_only():
     assert d["recommended"]["enclosed"]
 
 
+def test_render_marks_desktop_mode():
+    assert "const DESKTOP = true" in render_html()
+
+
+def test_state_persists_across_app_instances():
+    import tempfile
+    import desktop_app
+
+    tmp = tempfile.mktemp(suffix=".json")
+    os.environ["UHAUL_STATE_FILE"] = tmp
+    try:
+        # A fresh launch with no file yet sees an empty load.
+        assert Api().load_state() == {}
+        # Save a load, then a brand-new Api (simulating a relaunch) reads it back.
+        payload = {"entries": [["sofa", {"qty": 2}]], "enclosed": True, "collapsed": ["Boxes"]}
+        assert Api().save_state(payload) is True
+        assert Api().load_state() == payload
+        assert desktop_app.state_file().exists()
+    finally:
+        os.environ.pop("UHAUL_STATE_FILE", None)
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+
+
+def test_load_state_tolerates_a_corrupt_file():
+    import tempfile
+
+    tmp = tempfile.mktemp(suffix=".json")
+    with open(tmp, "w") as f:
+        f.write("{ this is not json")
+    os.environ["UHAUL_STATE_FILE"] = tmp
+    try:
+        assert Api().load_state() == {}   # never raises
+    finally:
+        os.environ.pop("UHAUL_STATE_FILE", None)
+        os.remove(tmp)
+
+
 def test_main_is_callable_without_gui():
     # We can't open a window here, but main() should exist and the lazy
     # pywebview import must not have happened at module load.
