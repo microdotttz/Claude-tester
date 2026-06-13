@@ -139,6 +139,25 @@ def test_all_catalog_items_are_well_formed():
         assert it.total_volume_cuft > 0
 
 
+def test_mattress_footprints_match_industry_standard_sizes():
+    # Locks the audited mattress sizes (W x L) to the standard mattress sizes.
+    expected = {
+        "twin_mattress": (38, 75),
+        "full_mattress": (54, 75),
+        "queen_mattress": (60, 80),
+        "king_mattress": (76, 80),
+    }
+    for slug, (w, l) in expected.items():
+        it = get_catalog_item(slug)
+        assert (it.width, it.length) == (w, l), f"{slug} footprint drifted"
+
+
+def test_moving_boxes_match_standard_box_volumes():
+    # Standard moving-box sizes: small 1.5, medium 3.0, large 4.5 cu ft.
+    assert abs(get_catalog_item("box_medium").volume_cuft - 3.0) < 0.05
+    assert abs(get_catalog_item("box_large").volume_cuft - 4.5) < 0.05
+
+
 # --- flexible (bendable) items -------------------------------------------
 
 def test_flexible_item_squeezes_into_a_tight_space():

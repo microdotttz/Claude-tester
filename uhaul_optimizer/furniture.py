@@ -56,10 +56,10 @@ class FurnitureItem:
 FURNITURE_CATALOG: dict[str, FurnitureItem] = {
     # Bedroom -- mattresses are flexible (they bow into tight gaps); box
     # springs are rigid wooden frames and are not.
-    "twin_mattress": FurnitureItem("Twin mattress", 75, 39, 9, 45, flexible=True),
-    "full_mattress": FurnitureItem("Full mattress", 75, 54, 10, 55, flexible=True),
-    "queen_mattress": FurnitureItem("Queen mattress", 80, 60, 11, 70, flexible=True),
-    "king_mattress": FurnitureItem("King mattress", 80, 76, 12, 90, flexible=True),
+    "twin_mattress": FurnitureItem("Twin mattress", 75, 38, 9, 45, flexible=True),
+    "full_mattress": FurnitureItem("Full mattress", 75, 54, 10, 60, flexible=True),
+    "queen_mattress": FurnitureItem("Queen mattress", 80, 60, 11, 85, flexible=True),
+    "king_mattress": FurnitureItem("King mattress", 80, 76, 12, 115, flexible=True),
     "box_spring_queen": FurnitureItem("Queen box spring", 80, 60, 9, 50, keep_upright=False),
     "bed_frame": FurnitureItem("Bed frame (disassembled)", 80, 12, 8, 60),
     "nightstand": FurnitureItem("Nightstand", 24, 18, 26, 30, keep_upright=True),
@@ -82,7 +82,7 @@ FURNITURE_CATALOG: dict[str, FurnitureItem] = {
     # Appliances
     # Taller than any trailer's ceiling, so it must travel on its side in a
     # trailer (keep_upright=False). Ideally moved upright in a truck — see notes.
-    "refrigerator": FurnitureItem("Refrigerator", 36, 33, 70, 250, keep_upright=False, stackable=False),
+    "refrigerator": FurnitureItem("Refrigerator", 36, 33, 70, 300, keep_upright=False, stackable=False),
     "washer": FurnitureItem("Washer", 27, 30, 39, 180, keep_upright=True, stackable=False),
     "dryer": FurnitureItem("Dryer", 27, 30, 39, 130, keep_upright=True, stackable=False),
     "microwave": FurnitureItem("Microwave", 22, 18, 14, 35),
