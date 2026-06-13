@@ -148,30 +148,47 @@ The first trailer that passes all checks is the recommendation.
 > means "this should fit with careful loading." Confirm exact trailer specs and
 > weight limits at [uhaul.com](https://www.uhaul.com) and measure tight pieces.
 
-## Quick start (web app)
+## Quick start (desktop app)
 
-One command — it installs Flask if needed, picks a free port, and opens your
-browser:
+One command opens a native desktop window. The first run installs the UI engine
+([pywebview](https://pywebview.flowrl.com/)) automatically:
 
 ```bash
 ./start_uhaul.sh          # macOS / Linux
 start_uhaul.bat           # Windows (double-click works too)
-python launch_uhaul.py    # any platform
+python desktop_app.py     # any platform
 ```
 
-The terminal also prints a `http://<your-ip>:<port>` URL you can open on your
-phone over the same WiFi. Useful flags: `--port N`, `--no-browser`.
+It's a real desktop application — its own window, title bar, and resizing — with
+**no browser, no web server, and no network**. The furniture catalog is baked
+into the page and the **Find my trailer** button calls straight into Python
+through pywebview's JS bridge.
 
-The web UI gives you:
+The app gives you:
 
 - **Quick presets** — Dorm room, Studio, and 1-Bedroom starting points
-- A **categorized, searchable furniture catalog** — tap a card to add it
+- A **categorized, searchable furniture catalog** — click a card to add it
 - **Custom items** with dimensions, weight, upright/no-stack flags
 - An animated recommendation card with a capacity gauge
 - An **interactive isometric load plan** — drag the slider to step through the
   exact loading order the packer computed, item by item
 - A per-trailer breakdown explaining *why* each trailer does or doesn't fit
-- Your load is saved in the browser, so it survives a refresh
+- Your load is remembered between launches
+
+> **Platform notes:** macOS uses the built-in WebKit and Windows uses the
+> Edge WebView2 runtime (preinstalled on Windows 10/11), so no extra setup is
+> needed. On **Linux**, pywebview needs a GUI backend — install one with
+> `pip install "pywebview[qt]"` (or `"pywebview[gtk]"` with system
+> GTK/WebKit2GTK packages).
+
+### Optional web version
+
+Prefer a browser or phone (e.g. on a headless machine)? The same UI is served
+over HTTP by Flask:
+
+```bash
+python launch_uhaul.py    # installs Flask, opens a browser, prints a phone URL
+```
 
 ## CLI usage
 
@@ -236,7 +253,8 @@ else:
 
 ```bash
 python tests/test_optimizer.py   # packing engine + trailer evaluation
-python tests/test_web.py         # web API
+python tests/test_desktop.py     # desktop app bridge + HTML rendering
+python tests/test_web.py         # optional web API
 ```
 
 ## Disclaimer

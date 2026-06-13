@@ -1,5 +1,5 @@
 @echo off
-rem Double-clickable launcher for the U-Haul Space Optimizer (Windows).
+rem Double-clickable launcher for the U-Haul Space Optimizer desktop app (Windows).
 cd /d "%~dp0"
 where python >nul 2>nul
 if errorlevel 1 (
@@ -7,5 +7,5 @@ if errorlevel 1 (
     pause
     exit /b 1
 )
-python launch_uhaul.py %*
-pause
+python desktop_app.py %*
+if errorlevel 1 pause

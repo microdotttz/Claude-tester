@@ -506,21 +506,34 @@ function refresh() {
   save();
 }
 
-/* ---------- optimize ---------- */
+/* ---------- optimize ----------
+   Desktop build: call straight into Python via the pywebview bridge.
+   Web build: POST to the Flask API. Same UI, same result shape. */
+function hasBridge() {
+  return !!(window.pywebview && window.pywebview.api && window.pywebview.api.optimize);
+}
+async function runOptimize(body) {
+  if (hasBridge()) {
+    return await window.pywebview.api.optimize(body);   // -> result dict or {error}
+  }
+  const res = await fetch("/api/optimize", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) return { error: data.error || "Something went wrong." };
+  return data;
+}
 async function optimize() {
   const go = $("go");
   go.disabled = true; go.textContent = "Packing…";
   const items = [...picked.values()].map(v => v.item);
   try {
-    const res = await fetch("/api/optimize", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items, enclosed_only: $("enclosed").checked }),
-    });
-    const data = await res.json();
-    if (!res.ok) { toast(data.error || "Something went wrong."); return; }
+    const data = await runOptimize({ items, enclosed_only: $("enclosed").checked });
+    if (data && data.error) { toast(data.error); return; }
     renderResult(data);
   } catch (e) {
-    toast("Network error: " + e.message);
+    toast("Couldn't optimize: " + e.message);
   } finally {
     go.disabled = picked.size === 0;
     go.innerHTML = "Find my trailer&ensp;🚚";

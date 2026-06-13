@@ -5,4 +5,9 @@ matplotlib>=3.7.0
 mplfinance>=0.12.10b0
 ta>=0.10.2
 rich>=13.0.0
-flask>=3.0.0
+
+# U-Haul space optimizer
+pywebview>=5.0      # native desktop app window (desktop_app.py)
+jinja2>=3.0         # HTML templating for the desktop app
+flask>=3.0.0        # optional headless web server (launch_uhaul.py)
+# On Linux, pywebview needs a GUI backend, e.g.  pip install "pywebview[qt]"

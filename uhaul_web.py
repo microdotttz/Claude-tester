@@ -1,120 +1,34 @@
-"""Flask web app for the U-Haul space optimizer (mobile-friendly)."""
+"""Optional Flask web server for the U-Haul space optimizer.
+
+The primary interface is the desktop app (``desktop_app.py``). This thin server
+is kept for headless/remote use and shares all of its logic with the desktop
+app via ``uhaul_optimizer.serialization``.
+"""
 
 import os
 
 from flask import Flask, render_template, request, jsonify
 
-from uhaul_optimizer.furniture import (
-    FURNITURE_CATALOG,
-    FURNITURE_CATEGORIES,
-    FurnitureItem,
-    get_catalog_item,
-)
-from uhaul_optimizer.optimizer import find_minimum_trailer
-from uhaul_optimizer.trailers import UHAUL_TRAILERS
+from uhaul_optimizer.serialization import catalog_payload, optimize_payload
 
 app = Flask(__name__, template_folder="templates")
 
 
 @app.route("/")
 def index():
-    """Main page with the furniture catalog pre-loaded."""
-    catalog = [
-        {
-            "slug": slug,
-            "name": item.name,
-            "category": FURNITURE_CATEGORIES.get(slug, "Other"),
-            "length": item.length,
-            "width": item.width,
-            "height": item.height,
-            "weight": item.weight,
-            "volume": round(item.volume_cuft, 1),
-            "keep_upright": item.keep_upright,
-            "stackable": item.stackable,
-        }
-        for slug, item in FURNITURE_CATALOG.items()
-    ]
-    return render_template("uhaul.html", catalog=catalog)
-
-
-def _items_from_payload(payload: list[dict]) -> list[FurnitureItem]:
-    items: list[FurnitureItem] = []
-    for obj in payload:
-        qty = int(obj.get("quantity", 1))
-        if qty <= 0:
-            continue
-        if obj.get("slug") in FURNITURE_CATALOG:
-            items.append(get_catalog_item(obj["slug"], qty))
-        else:
-            items.append(FurnitureItem(
-                name=str(obj.get("name", "Custom item")),
-                length=float(obj["length"]),
-                width=float(obj["width"]),
-                height=float(obj["height"]),
-                weight=float(obj.get("weight", 0) or 0),
-                quantity=qty,
-                keep_upright=bool(obj.get("keep_upright", False)),
-                stackable=bool(obj.get("stackable", True)),
-            ))
-    return items
+    return render_template("uhaul.html", catalog=catalog_payload())
 
 
 @app.route("/api/optimize", methods=["POST"])
 def optimize():
-    """Return the smallest trailer that fits the submitted inventory."""
     data = request.get_json(silent=True) or {}
-    payload = data.get("items", [])
-    enclosed_only = bool(data.get("enclosed_only", False))
-
-    if not payload:
-        return jsonify({"error": "Add at least one item."}), 400
-
     try:
-        items = _items_from_payload(payload)
-    except (KeyError, ValueError, TypeError) as e:
+        result = optimize_payload(data.get("items", []), bool(data.get("enclosed_only", False)))
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except (KeyError, TypeError) as e:
         return jsonify({"error": f"Bad item data: {e}"}), 400
-
-    if not items:
-        return jsonify({"error": "Add at least one item."}), 400
-
-    rec = find_minimum_trailer(items, enclosed_only=enclosed_only)
-
-    def fit_dict(ev):
-        d = {
-            "trailer": ev.trailer.name,
-            "fits": ev.fits,
-            "enclosed": ev.trailer.enclosed,
-            "volume_cuft": ev.trailer.volume_cuft,
-            "max_load": ev.trailer.max_load,
-            "utilization": round(ev.utilization * 100),
-            "summary": ev.trailer.summary(),
-            "note": ev.trailer.note,
-            "blockers": ev.blockers,
-            "container": {
-                "length": ev.trailer.length,
-                "width": ev.trailer.width,
-                "height": ev.trailer.height,
-            },
-            # Placement coordinates power the load-plan diagram; only fitting
-            # trailers have a complete (and therefore meaningful) arrangement.
-            "placements": [
-                {
-                    "name": p.name,
-                    "x": p.box.x, "y": p.box.y, "z": p.box.z,
-                    "l": p.box.length, "w": p.box.width, "h": p.box.height,
-                }
-                for p in ev.pack_result.placements
-            ] if ev.fits else [],
-        }
-        return d
-
-    return jsonify({
-        "total_volume": round(rec.total_volume_cuft),
-        "total_weight": round(rec.total_weight),
-        "fits_any": rec.fits_any,
-        "recommended": fit_dict(rec.recommended) if rec.recommended else None,
-        "evaluations": [fit_dict(e) for e in rec.evaluations],
-    })
+    return jsonify(result)
 
 
 if __name__ == "__main__":

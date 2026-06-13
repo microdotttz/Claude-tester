@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
-One-command launcher for the U-Haul Space Optimizer web app.
+Launcher for the OPTIONAL web version of the U-Haul Space Optimizer.
+
+The main app is the native desktop window -- run ``python desktop_app.py``
+(or ./start_uhaul.sh). Use this script only when you want a browser/phone
+version instead, e.g. on a headless machine:
 
     python launch_uhaul.py
 
