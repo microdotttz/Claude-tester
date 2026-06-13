@@ -14,6 +14,8 @@ from .serialization import (
     optimize_payload,
     recommendation_to_dict,
 )
+from .lovesac import lovesac_items, lovesac_components_payload
+from .scraper import parse_listing, fetch_listing
 
 __all__ = [
     "Trailer",
@@ -29,4 +31,8 @@ __all__ = [
     "items_from_payload",
     "optimize_payload",
     "recommendation_to_dict",
+    "lovesac_items",
+    "lovesac_components_payload",
+    "parse_listing",
+    "fetch_listing",
 ]

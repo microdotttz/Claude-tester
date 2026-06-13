@@ -174,13 +174,30 @@ through pywebview's JS bridge.
 The app gives you:
 
 - **Quick presets** — Dorm room, Studio, and 1-Bedroom starting points
-- A **categorized, searchable furniture catalog** — click a card to add it
+- A **searchable furniture catalog grouped into collapsible categories**, each
+  showing how many items it holds and how many you've picked
+- **Add from a link** — paste a product URL and the app fetches the listing and
+  fills in the dimensions for you (see below)
+- A **Lovesac Sactional configurator** — set how many Sides, Bottoms (seats),
+  Cushions, and Pillows you have and it adds the whole couch, with the soft
+  pieces flagged flexible so they pack into gaps
 - **Custom items** with dimensions, weight, upright/no-stack flags
 - An animated recommendation card with a capacity gauge
 - An **interactive isometric load plan** — drag the slider to step through the
-  exact loading order the packer computed, item by item
+  exact loading order the packer computed, plus a tongue-weight balance bar
 - A per-trailer breakdown explaining *why* each trailer does or doesn't fit
-- Your load is remembered between launches
+- Your load, collapsed groups, and settings are remembered between launches
+
+### Add from a link (auto-dimensions)
+
+Paste a furniture product URL and the app downloads the page and extracts its
+size. It reads schema.org **Product** structured data first (the most reliable
+source on major retail sites), then falls back to parsing dimensions out of the
+page text (`48 x 24 x 18 in`, or labeled `Width: 30 in` lines). Whatever it
+finds prefills the **Custom item** form for you to review and adjust before
+adding — furniture listings are inconsistent, so treat it as an assist, not
+gospel. The fetch runs in Python on your machine; only `http(s)` links are
+allowed and private/loopback addresses are refused.
 
 > **Platform notes:** macOS uses the built-in WebKit and Windows uses the
 > Edge WebView2 runtime (preinstalled on Windows 10/11), so no extra setup is
@@ -265,6 +282,7 @@ else:
 
 ```bash
 python tests/test_optimizer.py   # packing engine + trailer evaluation
+python tests/test_scraper.py     # URL dimension parser + Lovesac configurator
 python tests/test_desktop.py     # desktop app bridge + HTML rendering
 python tests/test_web.py         # optional web API
 ```

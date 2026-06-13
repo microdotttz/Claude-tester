@@ -15,10 +15,43 @@ def test_render_html_bakes_catalog_and_bridge():
     assert "<!DOCTYPE html>" in html
     # Catalog injected as JSON, not the raw Jinja expression.
     assert "{{ catalog" not in html
+    assert "{{ lovesac" not in html
     assert "queen_mattress" in html
     # The page knows how to talk to the desktop bridge.
     assert "window.pywebview" in html
     assert "planCanvas" in html  # load-plan diagram present
+    # New UI surfaces: collapsible groups, Lovesac configurator, URL fetch.
+    assert "catGroups" in html and "catgroup" in html
+    assert "Lovesac" in html and "lovesacRows" in html
+    assert "fetch_url" in html and 'id="u_url"' in html
+
+
+def test_fetch_url_bridge_rejects_bad_urls_without_network():
+    api = Api()
+    assert "error" in api.fetch_url("not-a-url")
+    assert "error" in api.fetch_url("http://localhost/x")
+    assert "error" in api.fetch_url("")
+
+
+def test_fetch_url_bridge_parses_inline_via_scraper():
+    # The bridge delegates to scraper.fetch_listing; patch its network call so we
+    # exercise the bridge end-to-end without hitting the internet.
+    import desktop_app
+    sample = (
+        '<html><head><title>Test Chair</title>'
+        '<script type="application/ld+json">'
+        '{"@type":"Product","name":"Test Chair",'
+        '"width":24,"depth":24,"height":36}</script></head></html>'
+    )
+    from uhaul_optimizer import scraper
+    orig = scraper.fetch_listing
+    desktop_app.fetch_listing = lambda url: scraper.parse_listing(sample, url)
+    try:
+        d = Api().fetch_url("https://store.test/chair")
+        assert d["ok"] and d["name"] == "Test Chair"
+        assert d["width"] == 24 and d["height"] == 36
+    finally:
+        desktop_app.fetch_listing = orig
 
 
 def test_api_optimize_returns_recommendation_with_placements():

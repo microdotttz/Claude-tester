@@ -70,6 +70,22 @@
   }
   .pill.on { background: var(--orange); border-color: var(--orange); color: #1a0d00; }
 
+  /* ---------- collapsible category groups ---------- */
+  .catgroup { border: 1px solid var(--line); border-radius: var(--radius); margin: 10px 0;
+    background: var(--card); overflow: hidden; }
+  .catgroup > summary {
+    list-style: none; cursor: pointer; padding: 13px 15px; font-weight: 700; font-size: 14.5px;
+    display: flex; align-items: center; gap: 10px; user-select: none;
+  }
+  .catgroup > summary::-webkit-details-marker { display: none; }
+  .catgroup > summary .chev { margin-left: auto; color: var(--muted); transition: transform .2s; font-size: 13px; }
+  .catgroup[open] > summary .chev { transform: rotate(90deg); }
+  .catgroup > summary .cat-emoji { font-size: 18px; }
+  .catgroup > summary .cat-count { font-size: 12px; color: var(--muted); font-weight: 500; }
+  .catgroup > summary .cat-picked { font-size: 11.5px; font-weight: 800; color: #1a0d00;
+    background: var(--orange); border-radius: 999px; padding: 2px 9px; }
+  .catgroup .grid { padding: 4px 12px 14px; }
+
   /* ---------- catalog ---------- */
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
   .item {
@@ -125,6 +141,21 @@
     border-radius: 10px; padding: 12px; font-size: 14.5px; font-weight: 700; cursor: pointer;
   }
   .addbtn:active { background: var(--orange); color: #1a0d00; }
+
+  /* ---------- Lovesac configurator ---------- */
+  .ls-row { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .ls-row:last-of-type { border-bottom: none; }
+  .ls-info { flex: 1; min-width: 0; }
+  .ls-info .ls-name { font-size: 14px; font-weight: 600; }
+  .ls-info .ls-dims { font-size: 11.5px; color: var(--muted); }
+  .ls-total { font-size: 12.5px; color: var(--muted); margin: 8px 0 12px; }
+  .ls-total b { color: var(--text); }
+
+  /* ---------- URL fetch ---------- */
+  .u-status { font-size: 12.5px; line-height: 1.5; margin-top: 6px; }
+  .u-status.busy { color: var(--orange); }
+  .u-status.ok { color: #4ade80; }
+  .u-status.err { color: #f87171; }
 
   .toggle { display: flex; align-items: center; gap: 10px; margin: 16px 2px; font-size: 14px; color: var(--muted); }
   .toggle input { width: 20px; height: 20px; accent-color: var(--orange); }
@@ -286,13 +317,34 @@
     <button class="preset ghost" id="clearAll">✕ Clear all</button>
   </div>
 
+  <h2>Lovesac Sactional</h2>
+  <details class="custom lovesac">
+    <summary>🛋️ Configure your Lovesac &mdash; count the pieces</summary>
+    <div class="custom-body">
+      <div id="lovesacRows"></div>
+      <div class="ls-total" id="lovesacTotal"></div>
+      <button class="addbtn" id="addLovesac">Add Lovesac to my load</button>
+    </div>
+  </details>
+
+  <h2>Add from a link</h2>
+  <details class="custom">
+    <summary>🔗 Paste a product URL and grab its size</summary>
+    <div class="custom-body">
+      <div class="row">
+        <input id="u_url" type="url" inputmode="url" placeholder="https://store.com/product/…">
+        <button class="addbtn" id="fetchUrl" style="min-width:96px">Fetch</button>
+      </div>
+      <div class="u-status" id="u_status"></div>
+    </div>
+  </details>
+
   <h2>Furniture catalog</h2>
   <input class="search" id="search" placeholder="Search furniture…" autocomplete="off">
-  <div class="pills" id="pills"></div>
-  <div class="grid" id="catalog"></div>
+  <div id="catGroups"></div>
 
   <h2>Custom item</h2>
-  <details class="custom">
+  <details class="custom" id="customItem">
     <summary>📐 Add something that's not in the catalog</summary>
     <div class="custom-body">
       <input id="c_name" placeholder="Name (e.g. Antique hutch)">
@@ -344,6 +396,14 @@
 <script>
 "use strict";
 const CATALOG = {{ catalog | tojson }};
+const LOVESAC = {{ lovesac | tojson }};
+
+const CATEGORY_ORDER = [...new Set(CATALOG.map(c => c.category))];
+const CATEGORY_EMOJI = {
+  Bedroom: "🛏️", "Living Room": "🛋️", Dining: "🍽️", Appliances: "🧊",
+  Office: "🖥️", Boxes: "📦",
+};
+const SLUG_CAT = Object.fromEntries(CATALOG.map(c => [c.slug, c.category]));
 
 const EMOJI = {
   twin_mattress:"🛏️", full_mattress:"🛏️", queen_mattress:"🛏️", king_mattress:"🛏️",
@@ -370,7 +430,7 @@ const fmt = n => Math.round(n).toLocaleString();
 // state: key (slug or custom_N) -> { item, qty, custom }
 let picked = new Map();
 let customSeq = 0;
-let activeCategory = "All";
+let collapsed = new Set();   // category names the user has collapsed
 let plans = {};        // trailer name -> { container, placements }
 let currentPlan = null;
 
@@ -381,6 +441,7 @@ function save() {
       entries: [...picked.entries()],
       customSeq,
       enclosed: $("enclosed").checked,
+      collapsed: [...collapsed],
     }));
   } catch (e) { /* private mode: ignore */ }
 }
@@ -391,6 +452,7 @@ function restore() {
     const d = JSON.parse(raw);
     picked = new Map(d.entries || []);
     customSeq = d.customSeq || 0;
+    collapsed = new Set(d.collapsed || []);
     $("enclosed").checked = !!d.enclosed;
   } catch (e) { picked = new Map(); }
 }
@@ -405,44 +467,66 @@ function toast(msg) {
   toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
 }
 
-/* ---------- catalog ---------- */
-function categories() {
-  return ["All", ...new Set(CATALOG.map(c => c.category))];
+/* ---------- catalog (collapsible category groups) ---------- */
+function pickedInCat(cat) {
+  let n = 0;
+  for (const v of picked.values()) {
+    const s = v.item.slug;
+    if (s && SLUG_CAT[s] === cat) n += v.qty;
+  }
+  return n;
 }
-function renderPills() {
-  $("pills").innerHTML = categories().map(c =>
-    `<button class="pill ${c === activeCategory ? "on" : ""}" data-cat="${esc(c)}">${esc(c)}</button>`
-  ).join("");
-  $("pills").querySelectorAll(".pill").forEach(b =>
-    b.onclick = () => { activeCategory = b.dataset.cat; renderPills(); renderCatalog(); });
+function itemCard(c) {
+  const qty = picked.get(c.slug)?.qty || 0;
+  const el = document.createElement("div");
+  el.className = "item" + (qty ? " active" : "");
+  el.innerHTML = `
+    ${qty ? `<div class="qty-badge">${qty}</div>` : ""}
+    <div class="emoji">${EMOJI[c.slug] || "📦"}</div>
+    <div class="name">${esc(c.name)}</div>
+    <div class="dims">${c.length}×${c.width}×${c.height}" · ${c.volume} cu ft</div>
+    <div class="stepper">
+      <button aria-label="remove one">−</button>
+      <span class="qty">${qty}</span>
+      <button aria-label="add one">+</button>
+    </div>`;
+  const [minus, plus] = el.querySelectorAll("button");
+  minus.onclick = e => { e.stopPropagation(); bump(c, -1); };
+  plus.onclick  = e => { e.stopPropagation(); bump(c, +1); };
+  el.onclick = () => bump(c, +1);   // tap anywhere on the card to add
+  return el;
 }
 function renderCatalog() {
   const q = $("search").value.trim().toLowerCase();
-  const box = $("catalog");
+  const searching = q.length > 0;
+  const box = $("catGroups");
   box.innerHTML = "";
-  CATALOG
-    .filter(c => activeCategory === "All" || c.category === activeCategory)
-    .filter(c => !q || c.name.toLowerCase().includes(q) || c.slug.includes(q))
-    .forEach(c => {
-      const qty = picked.get(c.slug)?.qty || 0;
-      const el = document.createElement("div");
-      el.className = "item" + (qty ? " active" : "");
-      el.innerHTML = `
-        ${qty ? `<div class="qty-badge">${qty}</div>` : ""}
-        <div class="emoji">${EMOJI[c.slug] || "📦"}</div>
-        <div class="name">${esc(c.name)}</div>
-        <div class="dims">${c.length}×${c.width}×${c.height}" · ${c.volume} cu ft</div>
-        <div class="stepper">
-          <button aria-label="remove one">−</button>
-          <span class="qty">${qty}</span>
-          <button aria-label="add one">+</button>
-        </div>`;
-      const [minus, plus] = el.querySelectorAll("button");
-      minus.onclick = e => { e.stopPropagation(); bump(c, -1); };
-      plus.onclick  = e => { e.stopPropagation(); bump(c, +1); };
-      el.onclick = () => bump(c, +1);   // tap anywhere on the card to add
-      box.appendChild(el);
+  CATEGORY_ORDER.forEach(cat => {
+    const items = CATALOG.filter(c => c.category === cat)
+      .filter(c => !q || c.name.toLowerCase().includes(q) || c.slug.includes(q));
+    if (searching && items.length === 0) return;   // hide empty groups while searching
+    const chosen = pickedInCat(cat);
+    const det = document.createElement("details");
+    det.className = "catgroup";
+    det.open = searching || !collapsed.has(cat);    // auto-expand while searching
+    det.innerHTML = `
+      <summary>
+        <span class="cat-emoji">${CATEGORY_EMOJI[cat] || "📦"}</span>
+        <span>${esc(cat)}</span>
+        <span class="cat-count">${items.length} item${items.length !== 1 ? "s" : ""}</span>
+        ${chosen ? `<span class="cat-picked">${chosen}</span>` : ""}
+        <span class="chev">▶</span>
+      </summary>
+      <div class="grid"></div>`;
+    const grid = det.querySelector(".grid");
+    items.forEach(c => grid.appendChild(itemCard(c)));
+    det.addEventListener("toggle", () => {
+      if (searching) return;   // don't record forced-open state during search
+      if (det.open) collapsed.delete(cat); else collapsed.add(cat);
+      save();
     });
+    box.appendChild(det);
+  });
 }
 function bump(c, delta) {
   const qty = (picked.get(c.slug)?.qty || 0) + delta;
@@ -453,6 +537,98 @@ function bump(c, delta) {
     qty,
   });
   refresh();
+}
+
+/* ---------- Lovesac configurator ---------- */
+const lovesacCounts = {};
+LOVESAC.forEach(c => lovesacCounts[c.key] = 0);
+
+function renderLovesac() {
+  const box = $("lovesacRows");
+  if (!box) return;
+  box.innerHTML = "";
+  LOVESAC.forEach(c => {
+    const row = document.createElement("div");
+    row.className = "ls-row";
+    row.innerHTML = `
+      <div class="ls-info">
+        <div class="ls-name">${esc(c.label)}</div>
+        <div class="ls-dims">${c.length}×${c.width}×${c.height}" · ${c.volume} cu ft each</div>
+      </div>
+      <div class="stepper" style="gap:4px">
+        <button aria-label="less">−</button>
+        <span class="qty">${lovesacCounts[c.key]}</span>
+        <button aria-label="more">+</button>
+      </div>`;
+    const [minus, plus] = row.querySelectorAll("button");
+    minus.onclick = () => { lovesacCounts[c.key] = Math.max(0, lovesacCounts[c.key] - 1); renderLovesac(); };
+    plus.onclick  = () => { lovesacCounts[c.key]++; renderLovesac(); };
+    box.appendChild(row);
+  });
+  let pieces = 0, vol = 0;
+  LOVESAC.forEach(c => { pieces += lovesacCounts[c.key]; vol += lovesacCounts[c.key] * c.volume; });
+  $("lovesacTotal").innerHTML = pieces
+    ? `<b>${pieces}</b> pieces · <b>${vol.toFixed(1)}</b> cu ft`
+    : "Set how many of each piece you have.";
+}
+function addLovesac() {
+  let added = 0;
+  LOVESAC.forEach(c => {
+    const qty = lovesacCounts[c.key];
+    if (qty <= 0) return;
+    const id = "lovesac_" + c.key;   // stable key: re-adding updates the count
+    picked.set(id, {
+      item: { name: c.name, length: c.length, width: c.width, height: c.height,
+              weight: c.weight, volume: c.volume, quantity: qty,
+              flexible: c.flexible, stackable: c.stackable },
+      qty, custom: true,
+    });
+    added += qty;
+    lovesacCounts[c.key] = 0;
+  });
+  if (!added) { toast("Add at least one Lovesac piece."); return; }
+  toast(`Added ${added} Lovesac piece${added !== 1 ? "s" : ""}`);
+  renderLovesac();
+  refresh();
+}
+
+/* ---------- fetch dimensions from a URL ---------- */
+async function fetchUrl() {
+  const url = $("u_url").value.trim();
+  const status = $("u_status");
+  if (!url) { status.className = "u-status err"; status.textContent = "Paste a product link first."; return; }
+  const btn = $("fetchUrl");
+  btn.disabled = true; btn.textContent = "…";
+  status.className = "u-status busy"; status.textContent = "Fetching…";
+  try {
+    let data;
+    if (hasBridge() && window.pywebview.api.fetch_url) {
+      data = await window.pywebview.api.fetch_url(url);
+    } else {
+      const res = await fetch("/api/fetch_url", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      data = await res.json();
+      if (!res.ok && !data.error) data = { error: "Couldn't read that page." };
+    }
+    if (data.error) { status.className = "u-status err"; status.textContent = data.error; return; }
+    // Prefill the custom-item form with whatever we found.
+    if (data.name) $("c_name").value = data.name;
+    if (data.length) $("c_l").value = data.length;
+    if (data.width)  $("c_w").value = data.width;
+    if (data.height) $("c_h").value = data.height;
+    if (data.weight) $("c_wt").value = data.weight;
+    const customBox = $("customItem");
+    if (customBox) customBox.open = true;
+    status.className = data.ok ? "u-status ok" : "u-status err";
+    status.textContent = (data.note || "") + " ↓ Review it under “Custom item”.";
+  } catch (e) {
+    status.className = "u-status err";
+    status.textContent = "Network error: " + e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = "Fetch";
+  }
 }
 
 /* ---------- custom items ---------- */
@@ -811,13 +987,16 @@ window.addEventListener("resize", () => {
 $("search").oninput = renderCatalog;
 $("go").onclick = optimize;
 $("addCustom").onclick = addCustom;
+$("addLovesac").onclick = addLovesac;
+$("fetchUrl").onclick = fetchUrl;
+$("u_url").addEventListener("keydown", e => { if (e.key === "Enter") fetchUrl(); });
 $("enclosed").onchange = save;
 $("clearAll").onclick = () => { picked = new Map(); $("result").innerHTML = ""; refresh(); };
 document.querySelectorAll(".preset[data-preset]").forEach(b =>
   b.onclick = () => applyPreset(b.dataset.preset));
 
 restore();
-renderPills();
+renderLovesac();
 refresh();
 </script>
 </body>

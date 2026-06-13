@@ -20,6 +20,8 @@ import sys
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from uhaul_optimizer.lovesac import lovesac_components_payload
+from uhaul_optimizer.scraper import fetch_listing
 from uhaul_optimizer.serialization import catalog_payload, optimize_payload
 
 APP_TITLE = "U-Haul Space Optimizer"
@@ -32,7 +34,10 @@ def render_html() -> str:
         loader=FileSystemLoader(_TEMPLATE_DIR),
         autoescape=select_autoescape(["html"]),
     )
-    return env.get_template("uhaul.html").render(catalog=catalog_payload())
+    return env.get_template("uhaul.html").render(
+        catalog=catalog_payload(),
+        lovesac=lovesac_components_payload(),
+    )
 
 
 class Api:
@@ -58,6 +63,15 @@ class Api:
             return {"error": str(e)}
         except (KeyError, TypeError) as e:
             return {"error": f"Bad item data: {e}"}
+
+    def fetch_url(self, url: str | None = None) -> dict:
+        """Fetch a product listing and extract its dimensions for review."""
+        try:
+            return fetch_listing(url or "")
+        except ValueError as e:
+            return {"error": str(e)}
+        except Exception:
+            return {"error": "Couldn't reach or read that page. Enter the size by hand."}
 
 
 def _ensure_pywebview():
