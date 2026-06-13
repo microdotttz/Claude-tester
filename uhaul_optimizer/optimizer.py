@@ -45,8 +45,25 @@ def _units_for(items: list[FurnitureItem]) -> list[Unit]:
                 stackable=item.stackable,
                 weight=item.weight,
                 flexible=item.flexible,
+                fillable=item.fillable,
             ))
     return units
+
+
+# A hollow shelf's own material is roughly its frame -- a lower bound on the
+# trailer volume it truly needs even with its cavity reused by other items.
+SHELF_FRAME_FRACTION = 0.30
+
+
+def _material_volume_cuft(items: list[FurnitureItem]) -> float:
+    """Lower bound on trailer volume: shelves count as frame only (they nest)."""
+    total = 0.0
+    for i in items:
+        v = i.total_volume_cuft
+        if i.fillable:
+            v *= SHELF_FRAME_FRACTION
+        total += v
+    return total
 
 
 def _passes_door(item: FurnitureItem, trailer: Trailer) -> bool:
@@ -119,10 +136,12 @@ def evaluate_trailer(items: list[FurnitureItem], trailer: Trailer) -> TrailerFit
                 f"{trailer.door_width:.0f}\"x{trailer.door_height:.0f}\" door, even tilted."
             )
 
-    # 3) Total volume can't exceed the trailer (a hard lower bound).
-    if total_vol > trailer.volume_cuft:
+    # 3) Material volume can't exceed the trailer (a hard lower bound). Shelves
+    # count as frame only, since smaller items nest inside them.
+    material_vol = _material_volume_cuft(items)
+    if material_vol > trailer.volume_cuft:
         blockers.append(
-            f"Furniture volume ({total_vol:.0f} cu ft) exceeds the trailer's "
+            f"Furniture volume ({material_vol:.0f} cu ft) exceeds the trailer's "
             f"{trailer.volume_cuft:.0f} cu ft."
         )
 
@@ -133,8 +152,11 @@ def evaluate_trailer(items: list[FurnitureItem], trailer: Trailer) -> TrailerFit
         unique = sorted({u.split(" #")[0] for u in result.unplaced})
         blockers.append("Couldn't arrange everything to fit: " + ", ".join(unique) + ".")
 
-    utilization = total_vol / trailer.volume_cuft if trailer.volume_cuft else 0.0
     fits = not blockers
+    # Utilization: when everything fits, use the packer's nesting-aware volume
+    # (items inside shelves don't double-count); otherwise the raw bounding sum.
+    used_vol = result.effective_used_volume_cuft if fits else total_vol
+    utilization = used_vol / trailer.volume_cuft if trailer.volume_cuft else 0.0
 
     # Tongue-weight advisory: only meaningful when everything is placed.
     front_pct: float | None = None

@@ -30,6 +30,7 @@ from typing import NamedTuple
 
 FLEX_RATIO = 0.88    # flexible items may be squeezed/bowed to 88% per dimension
 MIN_SUPPORT = 0.70   # off-floor placements need 70% of their base held up
+SHELF_WALL = 0.75    # panel thickness used to carve a shelf's inner cavity
 _EPS = 1e-6
 _SHUFFLE_SEED = 1234  # deterministic restarts so results are reproducible
 _N_SHUFFLES = 4
@@ -74,6 +75,7 @@ class Placement:
     name: str
     box: Box
     weight: float = 0.0
+    inside_shelf: bool = False   # placed within another item's (a shelf's) cavity
 
 
 @dataclass
@@ -90,11 +92,17 @@ class PackResult:
         return sum(p.box.volume for p in self.placements) / 1728.0
 
     @property
+    def effective_used_volume_cuft(self) -> float:
+        """Used volume counting shelf-nested items as free (they reuse the
+        shelf's already-counted outer box), so utilization stays meaningful."""
+        return sum(p.box.volume for p in self.placements if not p.inside_shelf) / 1728.0
+
+    @property
     def utilization(self) -> float:
         """Fraction of container volume occupied by placed items (0..1)."""
         if self.container_volume_cuft <= 0:
             return 0.0
-        return self.used_volume_cuft / self.container_volume_cuft
+        return self.effective_used_volume_cuft / self.container_volume_cuft
 
 
 class Unit(NamedTuple):
@@ -108,6 +116,7 @@ class Unit(NamedTuple):
     stackable: bool = True
     weight: float = 0.0
     flexible: bool = False
+    fillable: bool = False   # a shelf: hollow, so smaller items pack inside it
 
 
 def _orientations(l: float, w: float, h: float, keep_upright: bool) -> list[tuple[float, float, float]]:
@@ -149,13 +158,30 @@ def _clamp_to_space(
     return None
 
 
+def _inside_cavity(x: float, y: float, l: float, w: float, z: float, cavities) -> bool:
+    """True if an l x w base at height z sits within a shelf cavity (which holds
+    it up via the shelf's panels/walls at any internal level)."""
+    for c in cavities:
+        if (c.x - _EPS <= x and x + l <= c.x2 + _EPS
+                and c.y - _EPS <= y and y + w <= c.y2 + _EPS
+                and c.z - _EPS <= z < c.z2 - _EPS):
+            return True
+    return False
+
+
 def _support_fraction(
     x: float, y: float, l: float, w: float, z: float,
     placed: list[tuple[Box, bool]],
+    cavities=(),
 ) -> float:
-    """Fraction of an l x w base at height z resting on stackable tops."""
+    """Fraction of an l x w base at height z resting on stackable tops.
+
+    Returns 1.0 if the base sits inside a shelf cavity — the shelf's structure
+    holds items at any internal level."""
     if z <= _EPS:
         return 1.0  # the floor supports everything
+    if _inside_cavity(x, y, l, w, z, cavities):
+        return 1.0
     area = 0.0
     for box, stackable in placed:
         if not stackable or abs(box.z2 - z) > _EPS:
@@ -241,6 +267,7 @@ def _pack_once(container: tuple[float, float, float], order: list[Unit]) -> Pack
 
     free_spaces: list[Box] = [Box(0, 0, 0, cl, cw, ch)]
     placed_solid: list[tuple[Box, bool]] = []  # (box, stackable) for support checks
+    cavities: list[Box] = []                    # interior spaces of fillable shelves
 
     for u in order:
         best: tuple[tuple[float, float, float], Box] | None = None
@@ -252,10 +279,11 @@ def _pack_once(container: tuple[float, float, float], order: list[Unit]) -> Pack
                 if dims is None:
                     continue
                 col, cow, coh = dims
-                # No floating: off-floor bases need real support underneath.
+                # No floating: off-floor bases need real support underneath (or
+                # to be sitting inside a shelf, which holds them up).
                 if (space.z > _EPS
                         and _support_fraction(space.x, space.y, col, cow, space.z,
-                                              placed_solid) < MIN_SUPPORT - _EPS):
+                                              placed_solid, cavities) < MIN_SUPPORT - _EPS):
                     continue
                 # Prefer the lowest space (z), then back (x), then left (y) to
                 # pack bottom-up and dense. Within a space, prefer the
@@ -272,7 +300,8 @@ def _pack_once(container: tuple[float, float, float], order: list[Unit]) -> Pack
 
         (col, cow, coh), space = best
         placed = Box(space.x, space.y, space.z, col, cow, coh)
-        result.placements.append(Placement(u.name, placed, u.weight))
+        inside = _inside_cavity(placed.x, placed.y, placed.length, placed.width, placed.z, cavities)
+        result.placements.append(Placement(u.name, placed, u.weight, inside_shelf=inside))
         placed_solid.append((placed, u.stackable))
 
         # Re-split every free space the item intrudes upon.
@@ -282,6 +311,16 @@ def _pack_once(container: tuple[float, float, float], order: list[Unit]) -> Pack
                 new_spaces.extend(_split_space(s, placed, allow_top=u.stackable))
             else:
                 new_spaces.append(s)
+
+        # A fillable shelf is hollow: re-open its interior cavity as usable space
+        # so smaller items can be packed inside it.
+        if u.fillable:
+            cav = Box(placed.x + SHELF_WALL, placed.y + SHELF_WALL, placed.z + SHELF_WALL,
+                      max(0.0, col - 2 * SHELF_WALL), max(0.0, cow - 2 * SHELF_WALL),
+                      max(0.0, coh - 2 * SHELF_WALL))
+            if cav.length > _EPS and cav.width > _EPS and cav.height > _EPS:
+                cavities.append(cav)
+                new_spaces.append(cav)
         free_spaces = _prune(new_spaces)
 
     result.success = not result.unplaced

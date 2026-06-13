@@ -142,9 +142,12 @@ For each trailer (smallest to largest), it verifies:
 5. **3D packing** — a "maximal empty spaces" packer actually arranges all the
    pieces inside. It tries several loading orders (biggest-first, longest-first,
    heaviest-first, and seeded shuffles) and keeps the best, respecting each
-   item's `keep_upright`, `stackable`, and `flexible` flags. Items placed off
-   the floor must be **at least 70% supported** by stackable items below — no
-   furniture floats in mid-air.
+   item's `keep_upright`, `stackable`, `flexible`, and `fillable` flags. Items
+   placed off the floor must be **at least 70% supported** by stackable items
+   below — no furniture floats in mid-air. **Open shelves are hollow**, so the
+   packer stacks smaller items *inside* them instead of treating the shelf as a
+   solid block (and the nested items don't double-count toward how full the
+   trailer is).
 
 The first trailer that passes all checks is the recommendation. For every
 fitting trailer it also reports a **tongue-weight balance** — what share of the
@@ -176,7 +179,8 @@ The app gives you:
 - **Quick presets** — Dorm room, Studio, and 1-Bedroom starting points
 - A **searchable furniture catalog grouped into collapsible categories** (which
   start collapsed), each showing how many items it holds and how many you've
-  picked — now including an **IKEA Kallax** and a **Litter-Robot**
+  picked — including an **IKEA Kallax**, a **Litter-Robot**, and a
+  **Bambu Lab H2S 3D printer**
 - **Add from a link** — paste a product URL and the app fetches the listing and
   fills in the dimensions for you (see below)
 - A **Lovesac Sactional configurator** — set how many Sides, Bottoms (seats),
@@ -278,6 +282,9 @@ else:
   a truck, always move appliances upright.
 - `stackable` — whether other items may be placed on top. Glass tabletops and
   TVs are flagged non-stackable so the space above them stays clear.
+- `fillable` — open shelving (bookcase, IKEA Kallax, TV stand) whose hollow
+  interior holds smaller items. The packer stacks things *inside* it, so a
+  loaded shelf doesn't waste the trailer space its cubbies enclose.
 - `flexible` — soft items (mattresses) that bow into a slightly tight gap. The
   packer allows up to a 12% squeeze, calibrated so U-Haul's own published claims
   hold exactly: a **full mattress fits a 4x8**, a **queen fits a 5x8**, and a

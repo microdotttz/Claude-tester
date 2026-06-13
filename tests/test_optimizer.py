@@ -176,6 +176,35 @@ def test_kallax_and_litter_robot_are_in_the_catalog():
         assert find_minimum_trailer([get_catalog_item(slug)]).fits_any
 
 
+def test_bambu_printer_in_catalog():
+    from uhaul_optimizer.furniture import FURNITURE_CATEGORIES
+
+    b = get_catalog_item("bambu_h2s")
+    assert "Bambu" in b.name
+    assert FURNITURE_CATEGORIES["bambu_h2s"] == "Office"
+    assert b.keep_upright and not b.stackable   # precision machine
+    assert find_minimum_trailer([b]).fits_any
+
+
+def test_fillable_shelf_nests_smaller_items():
+    container = (33, 16, 60)   # just fits a standing Kallax
+    boxes = [Unit(f"b{i}", 13, 13, 13) for i in range(6)]
+    solid = pack(container, [Unit("Kallax", 30.375, 15.375, 57.875, fillable=False)] + boxes)
+    filled = pack(container, [Unit("Kallax", 30.375, 15.375, 57.875, fillable=True)] + boxes)
+    # A solid block can't share the space; a hollow shelf swallows the boxes.
+    assert not solid.success
+    assert filled.success
+    assert sum(p.inside_shelf for p in filled.placements) == 6
+    # Nested items don't double-count toward how full the trailer is.
+    assert filled.effective_used_volume_cuft < filled.used_volume_cuft - 1e-6
+
+
+def test_shelf_marked_fillable_in_catalog():
+    for slug in ("bookshelf", "kallax", "tv_stand"):
+        assert get_catalog_item(slug).fillable, f"{slug} should be fillable"
+    assert not get_catalog_item("dresser").fillable   # closed drawers, not open
+
+
 # --- flexible (bendable) items -------------------------------------------
 
 def test_flexible_item_squeezes_into_a_tight_space():

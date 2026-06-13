@@ -116,7 +116,7 @@ def test_render_marks_desktop_mode():
 def test_render_has_new_items_and_editable_lovesac():
     html = render_html()
     # New catalog items are baked in.
-    assert "kallax" in html and "litter_robot" in html
+    assert "kallax" in html and "litter_robot" in html and "bambu_h2s" in html
     # Lovesac measurements are editable and persisted; sizes can be reset.
     assert "ls-dim" in html and "lovesacDims" in html and "resetLovesac" in html
     # Categories default to collapsed for a fresh load.

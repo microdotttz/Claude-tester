@@ -14,6 +14,9 @@ Per-item flags:
                   (mattresses). The packer allows up to a 12% squeeze, which is
                   calibrated so U-Haul's own claims hold: a queen fits a 5x8, a
                   full fits a 4x8, and a king fits a 6x12.
+  fillable      - item is an open shelf (bookcase, cubby unit, TV stand) whose
+                  hollow interior can hold smaller items, so the packer may
+                  stack things inside it instead of treating it as a solid block.
 """
 
 from dataclasses import dataclass
@@ -33,6 +36,7 @@ class FurnitureItem:
     keep_upright: bool = False
     stackable: bool = True
     flexible: bool = False
+    fillable: bool = False
 
     @property
     def volume_cuft(self) -> float:
@@ -71,12 +75,13 @@ FURNITURE_CATALOG: dict[str, FurnitureItem] = {
     "loveseat": FurnitureItem("Loveseat", 60, 38, 34, 110, keep_upright=True),
     "armchair": FurnitureItem("Armchair / recliner", 35, 38, 40, 90, keep_upright=True),
     "coffee_table": FurnitureItem("Coffee table", 48, 24, 18, 40),
-    "tv_stand": FurnitureItem("TV stand", 60, 18, 24, 70, keep_upright=True),
+    "tv_stand": FurnitureItem("TV stand", 60, 18, 24, 70, keep_upright=True, fillable=True),
     "tv_55": FurnitureItem('55" flat-screen TV (boxed)', 52, 8, 32, 45, keep_upright=True, stackable=False),
-    "bookshelf": FurnitureItem("Bookshelf", 36, 12, 72, 80),  # rides on its back
+    # Open shelves are hollow -- fill them with boxes when you pack.
+    "bookshelf": FurnitureItem("Bookshelf", 36, 12, 72, 80, fillable=True),  # rides on its back
     # IKEA Kallax 2x4 (8-cube): 30 3/8" x 15 3/8" x 57 7/8". Reversible, so it
     # may lie down; particleboard is heavy for its size.
-    "kallax": FurnitureItem("IKEA Kallax (2x4, 8-cube)", 30.375, 15.375, 57.875, 60),
+    "kallax": FurnitureItem("IKEA Kallax (2x4, 8-cube)", 30.375, 15.375, 57.875, 60, fillable=True),
     "floor_lamp": FurnitureItem("Floor lamp (broken down)", 60, 8, 8, 12),
     # Dining / kitchen
     "dining_table": FurnitureItem("Dining table", 60, 36, 30, 90, stackable=False),
@@ -96,6 +101,10 @@ FURNITURE_CATALOG: dict[str, FurnitureItem] = {
     "desk": FurnitureItem("Desk", 55, 28, 30, 90, keep_upright=True),
     "office_chair": FurnitureItem("Office chair", 26, 26, 40, 35, keep_upright=True),
     "filing_cabinet": FurnitureItem("Filing cabinet", 18, 26, 30, 60, keep_upright=True),
+    # Bambu Lab H2S 3D printer (H2-series chassis ~19.5 x 20.5 x 25"). Precision
+    # machine: keep upright and don't stack on it. Verify against your unit.
+    "bambu_h2s": FurnitureItem("Bambu Lab H2S (3D printer)", 20.5, 19.5, 25, 48,
+                               keep_upright=True, stackable=False),
     # Boxes
     "box_small": FurnitureItem("Small box", 16, 12, 12, 25),
     "box_medium": FurnitureItem("Medium box", 18, 18, 16, 35),
@@ -115,7 +124,7 @@ _CATEGORY_GROUPS: dict[str, list[str]] = {
     ],
     "Dining": ["dining_table", "dining_chair", "bar_stool"],
     "Appliances": ["refrigerator", "washer", "dryer", "microwave", "litter_robot"],
-    "Office": ["desk", "office_chair", "filing_cabinet"],
+    "Office": ["desk", "office_chair", "filing_cabinet", "bambu_h2s"],
     "Boxes": ["box_small", "box_medium", "box_large"],
 }
 FURNITURE_CATEGORIES: dict[str, str] = {
@@ -141,6 +150,7 @@ def get_catalog_item(slug: str, quantity: int = 1) -> FurnitureItem:
         keep_upright=base.keep_upright,
         stackable=base.stackable,
         flexible=base.flexible,
+        fillable=base.fillable,
     )
 
 
