@@ -159,6 +159,47 @@ def test_load_state_tolerates_a_corrupt_file():
         os.remove(tmp)
 
 
+def test_custom_items_persist_across_app_instances():
+    import tempfile
+
+    tmp = tempfile.mktemp(suffix=".json")
+    os.environ["UHAUL_STATE_FILE"] = tmp
+    try:
+        # The exact shape the UI saves: a hand-entered custom item and a Lovesac
+        # piece with edited measurements, both keyed in `picked` like the page.
+        state = {
+            "entries": [
+                ["custom_0", {"item": {
+                    "name": "Antique hutch", "length": 44, "width": 20, "height": 72,
+                    "weight": 150, "volume": 36.7, "quantity": 1,
+                    "keep_upright": False, "stackable": True}, "qty": 1, "custom": True}],
+                ["lovesac_bottoms", {"item": {
+                    "name": "Lovesac Seat (base)", "length": 36, "width": 36, "height": 8,
+                    "weight": 38, "volume": 6.0, "quantity": 3,
+                    "flexible": False, "stackable": True}, "qty": 3, "custom": True}],
+            ],
+            "customSeq": 1,
+            "lovesacDims": {"bottoms": {"length": 36, "width": 36, "height": 8}},
+            "collapsed": ["Boxes"],
+        }
+        assert Api().save_state(state) is True
+        # A fresh instance (simulating a relaunch) gets the custom items back.
+        back = Api().load_state()
+        assert back == state
+        names = {v["item"]["name"] for _, v in back["entries"]}
+        assert "Antique hutch" in names and "Lovesac Seat (base)" in names
+        # The restored custom items (no slug) are still optimizable end-to-end.
+        items = [v["item"] for _, v in back["entries"]]
+        result = Api().optimize({"items": items})
+        assert result.get("fits_any")
+    finally:
+        os.environ.pop("UHAUL_STATE_FILE", None)
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+
+
 def test_main_is_callable_without_gui():
     # We can't open a window here, but main() should exist and the lazy
     # pywebview import must not have happened at module load.
