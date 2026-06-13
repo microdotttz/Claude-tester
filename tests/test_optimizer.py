@@ -158,6 +158,24 @@ def test_moving_boxes_match_standard_box_volumes():
     assert abs(get_catalog_item("box_large").volume_cuft - 4.5) < 0.05
 
 
+def test_kallax_and_litter_robot_are_in_the_catalog():
+    from uhaul_optimizer.furniture import FURNITURE_CATEGORIES
+
+    kallax = get_catalog_item("kallax")
+    assert "Kallax" in kallax.name
+    assert FURNITURE_CATEGORIES["kallax"] == "Living Room"
+    assert not kallax.keep_upright   # reversible unit, may lie down to pack
+
+    robot = get_catalog_item("litter_robot")
+    assert "Litter-Robot" in robot.name
+    assert FURNITURE_CATEGORIES["litter_robot"] == "Appliances"
+    assert robot.keep_upright and not robot.stackable   # motorized; don't crush
+
+    # Both should fit somewhere.
+    for slug in ("kallax", "litter_robot"):
+        assert find_minimum_trailer([get_catalog_item(slug)]).fits_any
+
+
 # --- flexible (bendable) items -------------------------------------------
 
 def test_flexible_item_squeezes_into_a_tight_space():

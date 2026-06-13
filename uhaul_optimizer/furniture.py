@@ -74,6 +74,9 @@ FURNITURE_CATALOG: dict[str, FurnitureItem] = {
     "tv_stand": FurnitureItem("TV stand", 60, 18, 24, 70, keep_upright=True),
     "tv_55": FurnitureItem('55" flat-screen TV (boxed)', 52, 8, 32, 45, keep_upright=True, stackable=False),
     "bookshelf": FurnitureItem("Bookshelf", 36, 12, 72, 80),  # rides on its back
+    # IKEA Kallax 2x4 (8-cube): 30 3/8" x 15 3/8" x 57 7/8". Reversible, so it
+    # may lie down; particleboard is heavy for its size.
+    "kallax": FurnitureItem("IKEA Kallax (2x4, 8-cube)", 30.375, 15.375, 57.875, 60),
     "floor_lamp": FurnitureItem("Floor lamp (broken down)", 60, 8, 8, 12),
     # Dining / kitchen
     "dining_table": FurnitureItem("Dining table", 60, 36, 30, 90, stackable=False),
@@ -86,6 +89,9 @@ FURNITURE_CATALOG: dict[str, FurnitureItem] = {
     "washer": FurnitureItem("Washer", 27, 30, 39, 180, keep_upright=True, stackable=False),
     "dryer": FurnitureItem("Dryer", 27, 30, 39, 130, keep_upright=True, stackable=False),
     "microwave": FurnitureItem("Microwave", 22, 18, 14, 35),
+    # Litter-Robot 4: ~22" W x 25" D x 29.5" H. Keep upright (motorized globe);
+    # don't stack on its plastic shell.
+    "litter_robot": FurnitureItem("Litter-Robot", 25, 22, 29.5, 24, keep_upright=True, stackable=False),
     # Office
     "desk": FurnitureItem("Desk", 55, 28, 30, 90, keep_upright=True),
     "office_chair": FurnitureItem("Office chair", 26, 26, 40, 35, keep_upright=True),
@@ -105,10 +111,10 @@ _CATEGORY_GROUPS: dict[str, list[str]] = {
     ],
     "Living Room": [
         "sofa", "loveseat", "armchair", "coffee_table", "tv_stand", "tv_55",
-        "bookshelf", "floor_lamp",
+        "bookshelf", "kallax", "floor_lamp",
     ],
     "Dining": ["dining_table", "dining_chair", "bar_stool"],
-    "Appliances": ["refrigerator", "washer", "dryer", "microwave"],
+    "Appliances": ["refrigerator", "washer", "dryer", "microwave", "litter_robot"],
     "Office": ["desk", "office_chair", "filing_cabinet"],
     "Boxes": ["box_small", "box_medium", "box_large"],
 }

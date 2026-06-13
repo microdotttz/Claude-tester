@@ -174,13 +174,15 @@ through pywebview's JS bridge.
 The app gives you:
 
 - **Quick presets** — Dorm room, Studio, and 1-Bedroom starting points
-- A **searchable furniture catalog grouped into collapsible categories**, each
-  showing how many items it holds and how many you've picked
+- A **searchable furniture catalog grouped into collapsible categories** (which
+  start collapsed), each showing how many items it holds and how many you've
+  picked — now including an **IKEA Kallax** and a **Litter-Robot**
 - **Add from a link** — paste a product URL and the app fetches the listing and
   fills in the dimensions for you (see below)
 - A **Lovesac Sactional configurator** — set how many Sides, Bottoms (seats),
-  Cushions, and Pillows you have and it adds the whole couch, with the soft
-  pieces flagged flexible so they pack into gaps
+  Cushions, and Pillows you have, and **edit each piece's measurements** to match
+  your set (your sizes are remembered). The soft pieces are flagged flexible so
+  they pack into gaps.
 - **Custom items** with dimensions, weight, upright/no-stack flags
 - An animated recommendation card with a capacity gauge
 - An **interactive isometric load plan** — drag the slider to step through the

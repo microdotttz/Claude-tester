@@ -113,6 +113,16 @@ def test_render_marks_desktop_mode():
     assert "const DESKTOP = true" in render_html()
 
 
+def test_render_has_new_items_and_editable_lovesac():
+    html = render_html()
+    # New catalog items are baked in.
+    assert "kallax" in html and "litter_robot" in html
+    # Lovesac measurements are editable and persisted; sizes can be reset.
+    assert "ls-dim" in html and "lovesacDims" in html and "resetLovesac" in html
+    # Categories default to collapsed for a fresh load.
+    assert "? d.collapsed : CATEGORY_ORDER" in html
+
+
 def test_state_persists_across_app_instances():
     import tempfile
     import desktop_app

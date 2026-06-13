@@ -143,13 +143,23 @@
   .addbtn:active { background: var(--orange); color: #1a0d00; }
 
   /* ---------- Lovesac configurator ---------- */
-  .ls-row { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .ls-hint { font-size: 11.5px; color: var(--muted); margin-bottom: 4px; }
+  .ls-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
   .ls-row:last-of-type { border-bottom: none; }
   .ls-info { flex: 1; min-width: 0; }
-  .ls-info .ls-name { font-size: 14px; font-weight: 600; }
-  .ls-info .ls-dims { font-size: 11.5px; color: var(--muted); }
-  .ls-total { font-size: 12.5px; color: var(--muted); margin: 8px 0 12px; }
+  .ls-info .ls-name { font-size: 14px; font-weight: 600; margin-bottom: 5px; }
+  .ls-fields { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+  .ls-dim { width: 52px; padding: 6px 7px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--text); font-size: 13px; outline: none; text-align: center; }
+  .ls-dim:focus { border-color: var(--orange); }
+  .ls-vol { margin-left: 6px; font-weight: 600; color: var(--text); }
+  .ls-total { font-size: 12.5px; color: var(--muted); margin: 10px 0 12px; }
   .ls-total b { color: var(--text); }
+  .ls-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .ls-actions .addbtn { flex: 1; min-width: 180px; }
+  .linkbtn { background: none; border: none; color: var(--muted); font-size: 12.5px;
+    cursor: pointer; text-decoration: underline; padding: 6px; }
+  .linkbtn:hover { color: var(--orange); }
 
   /* ---------- URL fetch ---------- */
   .u-status { font-size: 12.5px; line-height: 1.5; margin-top: 6px; }
@@ -321,9 +331,13 @@
   <details class="custom lovesac">
     <summary>🛋️ Configure your Lovesac &mdash; count the pieces</summary>
     <div class="custom-body">
+      <div class="ls-hint">Edit the size of each piece to match your set — sizes are remembered.</div>
       <div id="lovesacRows"></div>
       <div class="ls-total" id="lovesacTotal"></div>
-      <button class="addbtn" id="addLovesac">Add Lovesac to my load</button>
+      <div class="ls-actions">
+        <button class="addbtn" id="addLovesac">Add Lovesac to my load</button>
+        <button class="linkbtn" id="resetLovesac" type="button">Reset to standard sizes</button>
+      </div>
     </div>
   </details>
 
@@ -410,8 +424,8 @@ const EMOJI = {
   twin_mattress:"🛏️", full_mattress:"🛏️", queen_mattress:"🛏️", king_mattress:"🛏️",
   box_spring_queen:"🛏️", bed_frame:"🔩", nightstand:"🗃️", dresser:"🗄️", tall_dresser:"🚪",
   sofa:"🛋️", loveseat:"🛋️", armchair:"🪑", coffee_table:"☕", tv_stand:"📺", tv_55:"📺",
-  bookshelf:"📚", floor_lamp:"💡", dining_table:"🍽️", dining_chair:"🪑", bar_stool:"🥤",
-  refrigerator:"🧊", washer:"🌀", dryer:"🧺", microwave:"♨️", desk:"🖥️", office_chair:"💺",
+  bookshelf:"📚", kallax:"🗄️", floor_lamp:"💡", dining_table:"🍽️", dining_chair:"🪑", bar_stool:"🥤",
+  refrigerator:"🧊", washer:"🌀", dryer:"🧺", microwave:"♨️", litter_robot:"🐱", desk:"🖥️", office_chair:"💺",
   filing_cabinet:"🗄️", box_small:"📦", box_medium:"📦", box_large:"📦",
 };
 
@@ -432,6 +446,7 @@ const fmt = n => Math.round(n).toLocaleString();
 let picked = new Map();
 let customSeq = 0;
 let collapsed = new Set();   // category names the user has collapsed
+let lovesacDims = {};        // per-component dimension overrides (persisted)
 let plans = {};        // trailer name -> { container, placements }
 let currentPlan = null;
 
@@ -444,6 +459,7 @@ function currentState() {
     customSeq,
     enclosed: $("enclosed").checked,
     collapsed: [...collapsed],
+    lovesacDims,
   };
 }
 function save() {
@@ -464,7 +480,9 @@ function applyState(d) {
   try {
     picked = new Map(d.entries || []);
     customSeq = d.customSeq || 0;
-    collapsed = new Set(d.collapsed || []);
+    // Categories start collapsed for a fresh load; saved runs keep their state.
+    collapsed = new Set(Array.isArray(d.collapsed) ? d.collapsed : CATEGORY_ORDER);
+    lovesacDims = d.lovesacDims || {};
     $("enclosed").checked = !!d.enclosed;
   } catch (e) { picked = new Map(); }
 }
@@ -551,47 +569,89 @@ function bump(c, delta) {
   refresh();
 }
 
-/* ---------- Lovesac configurator ---------- */
+/* ---------- Lovesac configurator (with editable measurements) ---------- */
 const lovesacCounts = {};
 LOVESAC.forEach(c => lovesacCounts[c.key] = 0);
 
+// The dimensions to use for a component: the user's override, else the default.
+function lsDims(c) {
+  const o = lovesacDims[c.key] || {};
+  return {
+    length: o.length > 0 ? o.length : c.length,
+    width:  o.width  > 0 ? o.width  : c.width,
+    height: o.height > 0 ? o.height : c.height,
+  };
+}
+function lsVolume(c) {
+  const d = lsDims(c);
+  return (d.length * d.width * d.height) / 1728;
+}
+function lovesacTotalHTML() {
+  let pieces = 0, vol = 0;
+  LOVESAC.forEach(c => { pieces += lovesacCounts[c.key]; vol += lovesacCounts[c.key] * lsVolume(c); });
+  return pieces
+    ? `<b>${pieces}</b> pieces · <b>${vol.toFixed(1)}</b> cu ft`
+    : "Enter your measurements and counts. Sizes are saved for next time.";
+}
 function renderLovesac() {
   const box = $("lovesacRows");
   if (!box) return;
   box.innerHTML = "";
   LOVESAC.forEach(c => {
+    const d = lsDims(c);
     const row = document.createElement("div");
     row.className = "ls-row";
     row.innerHTML = `
       <div class="ls-info">
         <div class="ls-name">${esc(c.label)}</div>
-        <div class="ls-dims">${c.length}×${c.width}×${c.height}" · ${c.volume} cu ft each</div>
+        <div class="ls-fields">
+          <input class="ls-dim" data-k="length" type="number" inputmode="decimal" min="1" value="${d.length}" aria-label="${esc(c.label)} length">
+          <span>×</span>
+          <input class="ls-dim" data-k="width" type="number" inputmode="decimal" min="1" value="${d.width}" aria-label="${esc(c.label)} width">
+          <span>×</span>
+          <input class="ls-dim" data-k="height" type="number" inputmode="decimal" min="1" value="${d.height}" aria-label="${esc(c.label)} height">
+          <span class="ls-vol">${lsVolume(c).toFixed(1)} cu ft</span>
+        </div>
       </div>
       <div class="stepper" style="gap:4px">
         <button aria-label="less">−</button>
         <span class="qty">${lovesacCounts[c.key]}</span>
         <button aria-label="more">+</button>
       </div>`;
-    const [minus, plus] = row.querySelectorAll("button");
+    // Editing a dimension updates state in place (no re-render, keeps caret).
+    row.querySelectorAll(".ls-dim").forEach(inp => {
+      inp.oninput = () => {
+        const cur = lovesacDims[c.key] || {};
+        cur[inp.dataset.k] = parseFloat(inp.value) || 0;
+        lovesacDims[c.key] = cur;
+        row.querySelector(".ls-vol").textContent = lsVolume(c).toFixed(1) + " cu ft";
+        $("lovesacTotal").innerHTML = lovesacTotalHTML();
+        save();
+      };
+    });
+    const [minus, plus] = row.querySelectorAll(".stepper button");
     minus.onclick = () => { lovesacCounts[c.key] = Math.max(0, lovesacCounts[c.key] - 1); renderLovesac(); };
     plus.onclick  = () => { lovesacCounts[c.key]++; renderLovesac(); };
     box.appendChild(row);
   });
-  let pieces = 0, vol = 0;
-  LOVESAC.forEach(c => { pieces += lovesacCounts[c.key]; vol += lovesacCounts[c.key] * c.volume; });
-  $("lovesacTotal").innerHTML = pieces
-    ? `<b>${pieces}</b> pieces · <b>${vol.toFixed(1)}</b> cu ft`
-    : "Set how many of each piece you have.";
+  $("lovesacTotal").innerHTML = lovesacTotalHTML();
+}
+function resetLovesacSizes() {
+  lovesacDims = {};
+  save();
+  renderLovesac();
+  toast("Reset to standard Lovesac sizes");
 }
 function addLovesac() {
   let added = 0;
   LOVESAC.forEach(c => {
     const qty = lovesacCounts[c.key];
     if (qty <= 0) return;
+    const d = lsDims(c);
     const id = "lovesac_" + c.key;   // stable key: re-adding updates the count
     picked.set(id, {
-      item: { name: c.name, length: c.length, width: c.width, height: c.height,
-              weight: c.weight, volume: c.volume, quantity: qty,
+      item: { name: c.name, length: d.length, width: d.width, height: d.height,
+              weight: c.weight, volume: +lsVolume(c).toFixed(1), quantity: qty,
               flexible: c.flexible, stackable: c.stackable },
       qty, custom: true,
     });
@@ -1000,6 +1060,7 @@ $("search").oninput = renderCatalog;
 $("go").onclick = optimize;
 $("addCustom").onclick = addCustom;
 $("addLovesac").onclick = addLovesac;
+$("resetLovesac").onclick = resetLovesacSizes;
 $("fetchUrl").onclick = fetchUrl;
 $("u_url").addEventListener("keydown", e => { if (e.key === "Enter") fetchUrl(); });
 $("enclosed").onchange = save;
