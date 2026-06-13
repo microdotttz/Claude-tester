@@ -6,8 +6,13 @@ import math
 from dataclasses import dataclass, field
 
 from .furniture import FurnitureItem
-from .packer import PackResult, Unit, pack
+from .packer import FLEX_RATIO, PackResult, Unit, pack
 from .trailers import Trailer, UHAUL_TRAILERS
+
+# U-Haul advises roughly 60% of cargo weight over the front (hitch) half of the
+# trailer for stable towing. We flag loads that fall below this band.
+FRONT_WEIGHT_TARGET = 0.60
+FRONT_WEIGHT_MIN = 0.50
 
 
 @dataclass
@@ -21,6 +26,8 @@ class TrailerFit:
     total_weight: float
     utilization: float                       # 0..1, items volume / trailer volume
     blockers: list[str] = field(default_factory=list)   # reasons it does not fit
+    front_weight_pct: float | None = None    # % of weight over the front half
+    balance_advice: str = ""                  # tongue-weight tip when fitting
 
 
 def _units_for(items: list[FurnitureItem]) -> list[Unit]:
@@ -29,9 +36,16 @@ def _units_for(items: list[FurnitureItem]) -> list[Unit]:
     for item in items:
         for n in range(item.quantity):
             label = item.name if item.quantity == 1 else f"{item.name} #{n + 1}"
-            units.append(
-                (label, item.length, item.width, item.height, item.keep_upright, item.stackable)
-            )
+            units.append(Unit(
+                name=label,
+                length=item.length,
+                width=item.width,
+                height=item.height,
+                keep_upright=item.keep_upright,
+                stackable=item.stackable,
+                weight=item.weight,
+                flexible=item.flexible,
+            ))
     return units
 
 
@@ -43,9 +57,11 @@ def _passes_door(item: FurnitureItem, trailer: Trailer) -> bool:
     clears the opening either straight-on or tilted: at tilt angle theta its
     bounding box is (w*cos + t*sin) x (w*sin + t*cos), and sweeping theta over
     0-90 degrees also covers the swapped orientation. This is how a 54"-wide
-    mattress really does enter a 48"-wide door.
+    mattress really does enter a 48"-wide door. Flexible items (mattresses) may
+    bow inward, so the cross-section is allowed to shrink by ``FLEX_RATIO``.
     """
-    t, w = sorted(item.dims())[:2]  # thickness and width of the cross-section
+    shrink = FLEX_RATIO if item.flexible else 1.0
+    t, w = (d * shrink for d in sorted(item.dims())[:2])
     dw, dh = trailer.door_width, trailer.door_height
     for deg in range(0, 91):
         a = math.radians(deg)
@@ -53,6 +69,26 @@ def _passes_door(item: FurnitureItem, trailer: Trailer) -> bool:
                 and w * math.sin(a) + t * math.cos(a) <= dh):
             return True
     return False
+
+
+def _front_weight_fraction(result: PackResult, trailer_length: float) -> float | None:
+    """Fraction of packed weight resting over the front (hitch) half.
+
+    Each placed box contributes its weight in proportion to how much of its
+    length sits ahead of the trailer's midline.
+    """
+    mid = trailer_length / 2.0
+    total = front = 0.0
+    for p in result.placements:
+        if p.weight <= 0:
+            continue
+        total += p.weight
+        span = p.box.length
+        overlap = max(0.0, min(p.box.x2, mid) - p.box.x)
+        front += p.weight * (overlap / span if span else 0.0)
+    if total <= 0:
+        return None
+    return front / total
 
 
 def evaluate_trailer(items: list[FurnitureItem], trailer: Trailer) -> TrailerFit:
@@ -69,12 +105,13 @@ def evaluate_trailer(items: list[FurnitureItem], trailer: Trailer) -> TrailerFit
         )
 
     # 2) Each item must physically fit the interior and clear the door.
+    # Flexible items (mattresses) may bow into a slightly tight space, so their
+    # required dimensions shrink by FLEX_RATIO -- mirroring the packer.
+    idims = sorted([trailer.length, trailer.width, trailer.height])
     for item in items:
-        smallest_two = sorted(item.dims())[:2]
-        # Must fit interior in some orientation (handled fully by the packer too,
-        # but called out here for a clear message).
-        idims = sorted([trailer.length, trailer.width, trailer.height])
-        if sorted(item.dims())[2] > idims[2] + 1e-6 or smallest_two[1] > idims[1] + 1e-6 or smallest_two[0] > idims[0] + 1e-6:
+        shrink = FLEX_RATIO if item.flexible else 1.0
+        needed = sorted(d * shrink for d in item.dims())
+        if any(needed[i] > idims[i] + 1e-6 for i in range(3)):
             blockers.append(f"{item.name} is too big for the interior.")
         elif not _passes_door(item, trailer):
             blockers.append(
@@ -98,6 +135,28 @@ def evaluate_trailer(items: list[FurnitureItem], trailer: Trailer) -> TrailerFit
 
     utilization = total_vol / trailer.volume_cuft if trailer.volume_cuft else 0.0
     fits = not blockers
+
+    # Tongue-weight advisory: only meaningful when everything is placed.
+    front_pct: float | None = None
+    advice = ""
+    if fits:
+        frac = _front_weight_fraction(result, trailer.length)
+        if frac is not None:
+            front_pct = round(frac * 100)
+            if frac < FRONT_WEIGHT_MIN:
+                advice = (
+                    f"Only {front_pct}% of the weight is over the front axle — "
+                    "shift heavy items toward the hitch (aim for ~60%) to avoid "
+                    "trailer sway."
+                )
+            elif frac < FRONT_WEIGHT_TARGET - 0.05:
+                advice = (
+                    f"{front_pct}% of the weight is up front; nudge a few heavy "
+                    "boxes forward to reach the ~60% U-Haul recommends."
+                )
+            else:
+                advice = f"Well balanced — {front_pct}% of the weight rides over the front half."
+
     return TrailerFit(
         trailer=trailer,
         fits=fits,
@@ -106,6 +165,8 @@ def evaluate_trailer(items: list[FurnitureItem], trailer: Trailer) -> TrailerFit
         total_weight=total_wt,
         utilization=utilization,
         blockers=blockers,
+        front_weight_pct=front_pct,
+        balance_advice=advice,
     )
 
 

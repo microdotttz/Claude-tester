@@ -10,6 +10,10 @@ Per-item flags:
                   on any face.
   stackable     - other items may be stacked on top of this one. When False
                   (e.g. a glass table top), the space above it stays empty.
+  flexible      - item is soft and can bow/compress into a slightly tight gap
+                  (mattresses). The packer allows up to a 12% squeeze, which is
+                  calibrated so U-Haul's own claims hold: a queen fits a 5x8, a
+                  full fits a 4x8, and a king fits a 6x12.
 """
 
 from dataclasses import dataclass
@@ -28,6 +32,7 @@ class FurnitureItem:
     quantity: int = 1
     keep_upright: bool = False
     stackable: bool = True
+    flexible: bool = False
 
     @property
     def volume_cuft(self) -> float:
@@ -49,11 +54,12 @@ class FurnitureItem:
 # A catalog of common household items keyed by a short slug.
 # Sizes are typical; users should override with real measurements.
 FURNITURE_CATALOG: dict[str, FurnitureItem] = {
-    # Bedroom
-    "twin_mattress": FurnitureItem("Twin mattress", 75, 39, 9, 45, keep_upright=False),
-    "full_mattress": FurnitureItem("Full mattress", 75, 54, 10, 55, keep_upright=False),
-    "queen_mattress": FurnitureItem("Queen mattress", 80, 60, 11, 70, keep_upright=False),
-    "king_mattress": FurnitureItem("King mattress", 80, 76, 12, 90, keep_upright=False),
+    # Bedroom -- mattresses are flexible (they bow into tight gaps); box
+    # springs are rigid wooden frames and are not.
+    "twin_mattress": FurnitureItem("Twin mattress", 75, 39, 9, 45, flexible=True),
+    "full_mattress": FurnitureItem("Full mattress", 75, 54, 10, 55, flexible=True),
+    "queen_mattress": FurnitureItem("Queen mattress", 80, 60, 11, 70, flexible=True),
+    "king_mattress": FurnitureItem("King mattress", 80, 76, 12, 90, flexible=True),
     "box_spring_queen": FurnitureItem("Queen box spring", 80, 60, 9, 50, keep_upright=False),
     "bed_frame": FurnitureItem("Bed frame (disassembled)", 80, 12, 8, 60),
     "nightstand": FurnitureItem("Nightstand", 24, 18, 26, 30, keep_upright=True),
@@ -128,6 +134,7 @@ def get_catalog_item(slug: str, quantity: int = 1) -> FurnitureItem:
         quantity=quantity,
         keep_upright=base.keep_upright,
         stackable=base.stackable,
+        flexible=base.flexible,
     )
 
 

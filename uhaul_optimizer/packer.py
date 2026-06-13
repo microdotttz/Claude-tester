@@ -1,25 +1,46 @@
 """A 3D bin-packing heuristic for fitting furniture into a trailer.
 
-This uses a greedy "maximal empty spaces" placer: items are placed largest
-first, each into the lowest/back-most free space that can hold it, and the
-remaining free space is re-split after every placement.
+Items are placed one at a time into the lowest/back-most free space that can
+hold them (a greedy "maximal empty spaces" placer). Several loading orders are
+tried -- biggest-first, longest-first, heaviest-first, and a few seeded
+shuffles -- and the first order that packs everything wins (otherwise the best
+partial attempt is reported, so blocker messages stay meaningful).
 
-Bin packing in 3D is NP-hard, so this is a heuristic. It can occasionally fail
-to find a packing that a patient human (or a smarter solver) would manage. Treat
-a successful pack as "this should fit with careful loading" and a failure near
-the volume limit as "borderline" rather than a hard guarantee.
+Physical realism rules:
+
+- **No floating furniture.** An item placed off the floor must have at least
+  ``MIN_SUPPORT`` of its base area resting on stackable items whose tops are
+  exactly at its base height.
+- **Flexible items bend.** Units flagged ``flexible`` (mattresses) may be
+  squeezed/bowed down to ``FLEX_RATIO`` of any dimension when a space is
+  slightly too small, occupying only what the space allows. The 12% allowance
+  is calibrated against U-Haul's published claims: a queen mattress fits a
+  5x8, a full fits a 4x8, and a king fits a 6x12 -- and nothing smaller.
+
+Bin packing in 3D is NP-hard, so this remains a heuristic. Treat a successful
+pack as "this should fit with careful loading" and a failure near the volume
+limit as "borderline" rather than a hard guarantee.
 """
 
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass, field
+from typing import NamedTuple
+
+FLEX_RATIO = 0.88    # flexible items may be squeezed/bowed to 88% per dimension
+MIN_SUPPORT = 0.70   # off-floor placements need 70% of their base held up
+_EPS = 1e-6
+_SHUFFLE_SEED = 1234  # deterministic restarts so results are reproducible
+_N_SHUFFLES = 4
 
 
 @dataclass(frozen=True)
 class Box:
     """An axis-aligned box positioned with its corner at (x, y, z), inches.
 
-    x runs front-to-back (length), y side-to-side (width), z vertical (height).
+    x runs front-to-back (length, hitch end at x=0), y side-to-side (width),
+    z vertical (height).
     """
 
     x: float
@@ -52,6 +73,7 @@ class Placement:
 
     name: str
     box: Box
+    weight: float = 0.0
 
 
 @dataclass
@@ -75,10 +97,17 @@ class PackResult:
         return self.used_volume_cuft / self.container_volume_cuft
 
 
-# A unit is one indivisible piece to place: (name, l, w, h, keep_upright, stackable).
-Unit = tuple[str, float, float, float, bool, bool]
+class Unit(NamedTuple):
+    """One indivisible piece to place. Plain tuples coerce positionally."""
 
-_EPS = 1e-6
+    name: str
+    length: float
+    width: float
+    height: float
+    keep_upright: bool = False
+    stackable: bool = True
+    weight: float = 0.0
+    flexible: bool = False
 
 
 def _orientations(l: float, w: float, h: float, keep_upright: bool) -> list[tuple[float, float, float]]:
@@ -99,10 +128,43 @@ def _orientations(l: float, w: float, h: float, keep_upright: bool) -> list[tupl
     return seen
 
 
-def _fits(ol: float, ow: float, oh: float, space: Box) -> bool:
-    return (ol <= space.length + _EPS
-            and ow <= space.width + _EPS
-            and oh <= space.height + _EPS)
+def _clamp_to_space(
+    ol: float, ow: float, oh: float, space: Box, flexible: bool
+) -> tuple[float, float, float] | None:
+    """Dimensions the item would occupy in ``space``, or None if it can't fit.
+
+    Rigid items must fit as-is. Flexible items fit if every dimension can
+    squeeze to within the space at ``FLEX_RATIO``, and then occupy only what
+    the space allows (the squeeze presses against real walls/items, since
+    maximal spaces are bounded by them).
+    """
+    if flexible:
+        if (ol * FLEX_RATIO <= space.length + _EPS
+                and ow * FLEX_RATIO <= space.width + _EPS
+                and oh * FLEX_RATIO <= space.height + _EPS):
+            return (min(ol, space.length), min(ow, space.width), min(oh, space.height))
+        return None
+    if ol <= space.length + _EPS and ow <= space.width + _EPS and oh <= space.height + _EPS:
+        return (ol, ow, oh)
+    return None
+
+
+def _support_fraction(
+    x: float, y: float, l: float, w: float, z: float,
+    placed: list[tuple[Box, bool]],
+) -> float:
+    """Fraction of an l x w base at height z resting on stackable tops."""
+    if z <= _EPS:
+        return 1.0  # the floor supports everything
+    area = 0.0
+    for box, stackable in placed:
+        if not stackable or abs(box.z2 - z) > _EPS:
+            continue
+        dx = min(x + l, box.x2) - max(x, box.x)
+        dy = min(y + w, box.y2) - max(y, box.y)
+        if dx > 0 and dy > 0:
+            area += dx * dy
+    return area / (l * w)
 
 
 def _split_space(free: Box, placed: Box, allow_top: bool) -> list[Box]:
@@ -172,53 +234,109 @@ def _overlaps(a: Box, b: Box) -> bool:
             and a.z < b.z2 - _EPS and a.z2 > b.z + _EPS)
 
 
-def pack(container: tuple[float, float, float], units: list[Unit]) -> PackResult:
-    """Greedily pack ``units`` into a container of (length, width, height) inches."""
+def _pack_once(container: tuple[float, float, float], order: list[Unit]) -> PackResult:
+    """Greedily pack units in the given order; one attempt, no reordering."""
     cl, cw, ch = container
     result = PackResult(success=False, container_volume_cuft=(cl * cw * ch) / 1728.0)
 
-    # Hardest pieces first: largest volume, then longest single dimension.
-    order = sorted(
-        units,
-        key=lambda u: (u[1] * u[2] * u[3], max(u[1], u[2], u[3])),
-        reverse=True,
-    )
-
     free_spaces: list[Box] = [Box(0, 0, 0, cl, cw, ch)]
+    placed_solid: list[tuple[Box, bool]] = []  # (box, stackable) for support checks
 
-    for name, l, w, h, keep_upright, stackable in order:
-        best: tuple[tuple[float, float, float], int, Box] | None = None
-        best_score: tuple[float, float, float, float] | None = None
+    for u in order:
+        best: tuple[tuple[float, float, float], Box] | None = None
+        best_score: tuple[float, float, float, float, float] | None = None
 
-        for idx, space in enumerate(free_spaces):
-            for (ol, ow, oh) in _orientations(l, w, h, keep_upright):
-                if not _fits(ol, ow, oh, space):
+        for space in free_spaces:
+            for (ol, ow, oh) in _orientations(u.length, u.width, u.height, u.keep_upright):
+                dims = _clamp_to_space(ol, ow, oh, space, u.flexible)
+                if dims is None:
+                    continue
+                col, cow, coh = dims
+                # No floating: off-floor bases need real support underneath.
+                if (space.z > _EPS
+                        and _support_fraction(space.x, space.y, col, cow, space.z,
+                                              placed_solid) < MIN_SUPPORT - _EPS):
                     continue
                 # Prefer the lowest space (z), then back (x), then left (y) to
                 # pack bottom-up and dense. Within a space, prefer the
                 # orientation with the smallest footprint so we conserve floor
                 # area, then the shortest height.
-                score = (space.z, space.x, space.y, ol * ow, oh)
+                score = (space.z, space.x, space.y, col * cow, coh)
                 if best_score is None or score < best_score:
                     best_score = score
-                    best = ((ol, ow, oh), idx, space)
+                    best = ((col, cow, coh), space)
 
         if best is None:
-            result.unplaced.append(name)
+            result.unplaced.append(u.name)
             continue
 
-        (ol, ow, oh), _idx, space = best
-        placed = Box(space.x, space.y, space.z, ol, ow, oh)
-        result.placements.append(Placement(name, placed))
+        (col, cow, coh), space = best
+        placed = Box(space.x, space.y, space.z, col, cow, coh)
+        result.placements.append(Placement(u.name, placed, u.weight))
+        placed_solid.append((placed, u.stackable))
 
         # Re-split every free space the item intrudes upon.
         new_spaces: list[Box] = []
         for s in free_spaces:
             if _overlaps(s, placed):
-                new_spaces.extend(_split_space(s, placed, allow_top=stackable))
+                new_spaces.extend(_split_space(s, placed, allow_top=u.stackable))
             else:
                 new_spaces.append(s)
         free_spaces = _prune(new_spaces)
 
     result.success = not result.unplaced
     return result
+
+
+def _orderings(units: list[Unit]) -> list[list[Unit]]:
+    """Candidate loading orders to try, de-duplicated, deterministic."""
+    def vol(u: Unit) -> float:
+        return u.length * u.width * u.height
+
+    def maxdim(u: Unit) -> float:
+        return max(u.length, u.width, u.height)
+
+    def footprint(u: Unit) -> float:
+        d = sorted((u.length, u.width, u.height))
+        return d[1] * d[2]  # largest face
+
+    candidates = [
+        sorted(units, key=lambda u: (vol(u), maxdim(u)), reverse=True),      # biggest first
+        sorted(units, key=lambda u: (maxdim(u), vol(u)), reverse=True),      # longest first
+        sorted(units, key=lambda u: (footprint(u), vol(u)), reverse=True),   # widest face first
+        sorted(units, key=lambda u: (u.weight, vol(u)), reverse=True),       # heaviest first
+    ]
+    rng = random.Random(_SHUFFLE_SEED)
+    for _ in range(_N_SHUFFLES):
+        shuffled = list(units)
+        rng.shuffle(shuffled)
+        candidates.append(shuffled)
+
+    out: list[list[Unit]] = []
+    seen: set[tuple[str, ...]] = set()
+    for c in candidates:
+        key = tuple(u.name for u in c)
+        if key not in seen:
+            seen.add(key)
+            out.append(c)
+    return out
+
+
+def pack(container: tuple[float, float, float], units: list) -> PackResult:
+    """Pack ``units`` into a (length, width, height)-inch container.
+
+    Tries several loading orders and returns the first complete pack, or the
+    best partial attempt (fewest unplaced items, then most volume placed).
+    ``units`` may be :class:`Unit` instances or plain positional tuples.
+    """
+    coerced = [u if isinstance(u, Unit) else Unit(*u) for u in units]
+
+    best: PackResult | None = None
+    for order in _orderings(coerced):
+        result = _pack_once(container, order)
+        if result.success:
+            return result
+        if best is None or (len(result.unplaced), -result.used_volume_cuft) < \
+                (len(best.unplaced), -best.used_volume_cuft):
+            best = result
+    return best if best is not None else _pack_once(container, [])

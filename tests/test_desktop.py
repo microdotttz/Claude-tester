@@ -38,6 +38,20 @@ def test_api_optimize_returns_recommendation_with_placements():
         assert 0 <= p["z"] and p["z"] + p["h"] <= c["height"] + 1e-6
 
 
+def test_api_optimize_exposes_balance_and_placement_weights():
+    api = Api()
+    d = api.optimize({"items": [
+        {"slug": "refrigerator", "quantity": 1},
+        {"slug": "box_large", "quantity": 4},
+    ]})
+    rec = d["recommended"]
+    assert "front_weight_pct" in rec and rec["front_weight_pct"] is not None
+    assert isinstance(rec["balance_advice"], str) and rec["balance_advice"]
+    # Placements carry weight so the load plan can reason about balance.
+    assert all("weight" in p for p in rec["placements"])
+    assert any(p["weight"] > 0 for p in rec["placements"])
+
+
 def test_api_optimize_custom_item_with_flags():
     api = Api()
     d = api.optimize({"items": [

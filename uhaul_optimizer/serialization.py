@@ -74,6 +74,8 @@ def _fit_to_dict(ev: TrailerFit) -> dict:
         "summary": ev.trailer.summary(),
         "note": ev.trailer.note,
         "blockers": ev.blockers,
+        "front_weight_pct": ev.front_weight_pct,
+        "balance_advice": ev.balance_advice,
         "container": {
             "length": ev.trailer.length,
             "width": ev.trailer.width,
@@ -86,6 +88,7 @@ def _fit_to_dict(ev: TrailerFit) -> dict:
                 "name": p.name,
                 "x": p.box.x, "y": p.box.y, "z": p.box.z,
                 "l": p.box.length, "w": p.box.width, "h": p.box.height,
+                "weight": p.weight,
             }
             for p in ev.pack_result.placements
         ] if ev.fits else [],

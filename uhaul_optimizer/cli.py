@@ -112,6 +112,11 @@ def display_recommendation(rec: Recommendation, items: list[FurnitureItem]) -> N
         text.append(f"  Packs to ~{util*100:.0f}% of capacity  {_bar(util)}\n", style="cyan")
         if t.note:
             text.append(f"  {t.note}\n", style="dim")
+        if rec.recommended.balance_advice:
+            front = rec.recommended.front_weight_pct
+            good = front is not None and front >= 55
+            text.append(f"  ⚖ {rec.recommended.balance_advice}\n",
+                        style="green" if good else "yellow")
         console.print(Panel(text, title="✅ Smallest trailer that fits", border_style="green"))
     else:
         text = Text(

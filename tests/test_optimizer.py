@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from uhaul_optimizer.furniture import FurnitureItem, get_catalog_item
 from uhaul_optimizer.optimizer import evaluate_trailer, find_minimum_trailer
-from uhaul_optimizer.packer import Box, pack
+from uhaul_optimizer.packer import Box, Unit, pack, _orderings, _support_fraction
 from uhaul_optimizer.trailers import UHAUL_TRAILERS, get_trailer
 
 
@@ -137,6 +137,94 @@ def test_all_catalog_items_are_well_formed():
         it = get_catalog_item(slug)
         assert it.length > 0 and it.width > 0 and it.height > 0
         assert it.total_volume_cuft > 0
+
+
+# --- flexible (bendable) items -------------------------------------------
+
+def test_flexible_item_squeezes_into_a_tight_space():
+    # 60" wide into a 57" space: a rigid item fails, a flexible one bows in.
+    rigid = pack((96, 57, 54), [Unit("m", 80, 60, 11, flexible=False)])
+    assert not rigid.success
+    flex = pack((96, 57, 54), [Unit("m", 80, 60, 11, flexible=True)])
+    assert flex.success
+    # It occupies only the space available, not its full 60" width.
+    assert flex.placements[0].box.width <= 57 + 1e-6
+
+
+def test_mattress_claims_match_uhaul(  ):
+    # U-Haul's own published claims: full->4x8, queen->5x8, king->6x12.
+    for slug, expected in [("full_mattress", "4x8 Cargo Trailer"),
+                           ("queen_mattress", "5x8 Cargo Trailer"),
+                           ("king_mattress", "6x12 Cargo Trailer")]:
+        rec = find_minimum_trailer([get_catalog_item(slug)], enclosed_only=True)
+        assert rec.recommended is not None, f"{slug} should fit some enclosed trailer"
+        assert rec.recommended.trailer.name == expected, \
+            f"{slug} -> {rec.recommended.trailer.name}, expected {expected}"
+
+
+def test_rigid_box_spring_needs_a_bigger_trailer_than_the_mattress():
+    # A queen mattress flexes into a 5x8; the rigid box spring of the same
+    # footprint does not, so it needs the 6x12.
+    mattress = find_minimum_trailer([get_catalog_item("queen_mattress")], enclosed_only=True)
+    boxspring = find_minimum_trailer([get_catalog_item("box_spring_queen")], enclosed_only=True)
+    assert mattress.recommended.trailer.name == "5x8 Cargo Trailer"
+    assert boxspring.recommended.trailer.volume_cuft > mattress.recommended.trailer.volume_cuft
+
+
+# --- no floating furniture (support rule) --------------------------------
+
+def test_support_fraction_counts_only_stackable_tops_at_the_right_height():
+    assert _support_fraction(0, 0, 10, 10, 0, []) == 1.0  # floor holds everything
+    support = [(Box(0, 0, 0, 10, 10, 10), True)]
+    assert abs(_support_fraction(0, 0, 10, 10, 10, support) - 1.0) < 1e-6  # fully held
+    assert abs(_support_fraction(5, 0, 10, 10, 10, support) - 0.5) < 1e-6  # half overhang
+    # A non-stackable item underneath provides no support.
+    nostack = [(Box(0, 0, 0, 10, 10, 10), False)]
+    assert _support_fraction(0, 0, 10, 10, 10, nostack) == 0.0
+    # Wrong height (gap) provides no support.
+    assert _support_fraction(0, 0, 10, 10, 20, support) == 0.0
+
+
+def test_no_item_is_placed_without_enough_support():
+    # A floor of small boxes plus larger boxes; verify every off-floor box is
+    # at least 70% supported by stackable tops directly beneath it.
+    units = [Unit(f"b{i}", 24, 24, 24, weight=20) for i in range(12)]
+    res = pack((48, 48, 72), units)
+    placed = [(p.box, True) for p in res.placements]
+    for p in res.placements:
+        if p.box.z > 1e-6:
+            frac = _support_fraction(p.box.x, p.box.y, p.box.length, p.box.width,
+                                     p.box.z, placed)
+            assert frac >= 0.70 - 1e-6, f"{p.name} floats with only {frac:.0%} support"
+
+
+# --- multiple loading orders ---------------------------------------------
+
+def test_orderings_are_distinct_and_lead_with_biggest_first():
+    units = [Unit("a", 40, 30, 20, weight=5), Unit("b", 50, 10, 10, weight=50),
+             Unit("c", 30, 30, 30, weight=10)]
+    orders = _orderings(units)
+    assert len(orders) >= 4
+    # First ordering is biggest-volume-first (c=27000, a=24000, b=5000).
+    assert [u.name for u in orders[0]][:2] == ["c", "a"]
+    # All orderings are permutations of the same set.
+    for o in orders:
+        assert sorted(u.name for u in o) == ["a", "b", "c"]
+
+
+# --- tongue weight / balance ---------------------------------------------
+
+def test_balance_advice_present_and_flags_tail_heavy_load():
+    # A few heavy pieces plus light boxes: there should be a front-weight number
+    # and some balance advice on the recommended trailer.
+    items = [get_catalog_item("refrigerator"), get_catalog_item("washer"),
+             get_catalog_item("box_large", 6)]
+    rec = find_minimum_trailer(items)
+    assert rec.recommended is not None
+    fit = rec.recommended
+    assert fit.front_weight_pct is not None
+    assert 0 <= fit.front_weight_pct <= 100
+    assert fit.balance_advice  # non-empty
 
 
 if __name__ == "__main__":

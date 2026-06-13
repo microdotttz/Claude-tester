@@ -139,10 +139,17 @@ For each trailer (smallest to largest), it verifies:
 3. **Door clearance** — every item fits through the door opening, straight-on
    or tilted diagonally (how a 54"-wide mattress really enters a 48" door).
 4. **Volume** — the furniture's total volume doesn't exceed the trailer.
-5. **3D packing** — a greedy "maximal empty spaces" packer actually arranges
-   all the pieces inside, respecting `keep_upright` and `stackable` flags.
+5. **3D packing** — a "maximal empty spaces" packer actually arranges all the
+   pieces inside. It tries several loading orders (biggest-first, longest-first,
+   heaviest-first, and seeded shuffles) and keeps the best, respecting each
+   item's `keep_upright`, `stackable`, and `flexible` flags. Items placed off
+   the floor must be **at least 70% supported** by stackable items below — no
+   furniture floats in mid-air.
 
-The first trailer that passes all checks is the recommendation.
+The first trailer that passes all checks is the recommendation. For every
+fitting trailer it also reports a **tongue-weight balance** — what share of the
+load rides over the front (hitch) half — and nudges you toward the ~60% U-Haul
+recommends for stable towing.
 
 > Packing in 3D is NP-hard, so this is a heuristic estimate. A successful pack
 > means "this should fit with careful loading." Confirm exact trailer specs and
@@ -248,6 +255,11 @@ else:
   a truck, always move appliances upright.
 - `stackable` — whether other items may be placed on top. Glass tabletops and
   TVs are flagged non-stackable so the space above them stays clear.
+- `flexible` — soft items (mattresses) that bow into a slightly tight gap. The
+  packer allows up to a 12% squeeze, calibrated so U-Haul's own published claims
+  hold exactly: a **full mattress fits a 4x8**, a **queen fits a 5x8**, and a
+  **king fits a 6x12** — while a rigid box spring of the same footprint does
+  not, so it needs a larger trailer.
 
 ## Tests
 

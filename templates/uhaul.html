@@ -180,6 +180,25 @@
   .lg i { width: 13px; height: 13px; border-radius: 4px; display: inline-block; }
   .plan .hint { font-size: 11.5px; color: var(--muted); margin: 8px 0 0; line-height: 1.5; }
 
+  .balance { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 12px; }
+  .bal-top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline;
+    font-size: 13px; font-weight: 600; flex-wrap: wrap; }
+  .bal-tip { font-size: 11.5px; font-weight: 500; color: var(--muted); text-align: right; flex: 1; }
+  .balance.good .bal-tip { color: #4ade80; }
+  .balance.warn .bal-tip { color: #fbbf24; }
+  .balance.bad .bal-tip { color: #f87171; }
+  .bal-bar { position: relative; display: flex; height: 26px; border-radius: 8px; overflow: hidden;
+    margin: 9px 0 4px; border: 1px solid var(--line); font-size: 11px; font-weight: 700; }
+  .bal-front, .bal-back { display: flex; align-items: center; justify-content: center;
+    color: #1a0d00; white-space: nowrap; overflow: hidden; transition: width .7s cubic-bezier(.2,.8,.2,1); }
+  .bal-front { background: linear-gradient(90deg, var(--orange), var(--orange2)); }
+  .bal-back { background: var(--card2); color: var(--muted); }
+  .balance.bad .bal-front { background: linear-gradient(90deg, #f97316, var(--red)); }
+  /* Dashed marker at the 60% target line. */
+  .bal-target { position: absolute; top: -3px; bottom: -3px; left: 60%; width: 0;
+    border-left: 2px dashed rgba(255,255,255,.65); }
+  .bal-axis { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); }
+
   /* ---------- trailer cards ---------- */
   .tcard { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
     padding: 14px; margin-bottom: 10px; }
@@ -559,11 +578,35 @@ function gauge(pct) {
     </div>`;
 }
 
+function balanceWidget(rec) {
+  if (rec == null || rec.front_weight_pct == null) return "";
+  const front = rec.front_weight_pct, back = 100 - front;
+  // U-Haul aims for ~60% over the front (hitch) half.
+  const cls = front >= 55 ? "good" : front >= 50 ? "warn" : "bad";
+  const tip = front >= 55 ? "✓" : "⚠";
+  return `
+    <div class="balance ${cls}">
+      <div class="bal-top">
+        <span>⚖️ Weight balance</span>
+        <span class="bal-tip">${tip} ${esc(rec.balance_advice || "")}</span>
+      </div>
+      <div class="bal-bar" role="img" aria-label="${front}% front, ${back}% back">
+        <div class="bal-front" style="width:${front}%">front ${front}%</div>
+        <div class="bal-back" style="width:${back}%">back ${back}%</div>
+        <div class="bal-target" title="U-Haul target ~60%"></div>
+      </div>
+      <div class="bal-axis"><span>🔗 hitch (front)</span><span>door (back)</span></div>
+    </div>`;
+}
+
 function renderResult(d) {
   plans = {};
   d.evaluations.forEach(e => {
     if (e.fits && e.placements.length) {
-      plans[e.trailer] = { container: e.container, placements: e.placements };
+      plans[e.trailer] = {
+        container: e.container, placements: e.placements,
+        front_weight_pct: e.front_weight_pct, balance_advice: e.balance_advice,
+      };
     }
   });
 
@@ -603,6 +646,7 @@ function renderResult(d) {
         <canvas id="planCanvas"></canvas>
         <input type="range" id="planStep" min="1" value="1">
         <div class="legend" id="planLegend"></div>
+        <div id="planBalance">${balanceWidget(d.recommended)}</div>
         <p class="hint">Drag the slider to step through the loading order — items go in
         biggest-first, floor-first, starting at the hitch end (back-left of the drawing).</p>
       </div>`;
@@ -665,6 +709,9 @@ function setPlan(trailerName) {
   const n = currentPlan.placements.length;
   const slider = $("planStep");
   if (slider) { slider.max = n; slider.value = n; }
+  // Refresh the balance widget for whichever trailer's plan we're showing.
+  const bal = $("planBalance");
+  if (bal) bal.innerHTML = balanceWidget(currentPlan);
   // Legend with stable colors per distinct item.
   const names = [];
   currentPlan.placements.forEach(p => {
